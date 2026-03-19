@@ -16,7 +16,8 @@ class Color(str, Enum):
 
     @property
     def other(self) -> "Color":
-        return Color.BLACK if self is Color.RED else Color.RED
+        # Dùng == để tránh edge-case khi Color được tái tạo từ dữ liệu ngoài.
+        return Color.BLACK if self == Color.RED else Color.RED
 
 
 class PieceType(str, Enum):
@@ -50,7 +51,7 @@ def enemy_color(a: Optional[Piece], b: Optional[Piece]) -> bool:
 
 def palace_contains(color: Color, pos: Pos) -> bool:
     r, c = pos
-    if color is Color.RED:
+    if color == Color.RED:
         return 7 <= r <= 9 and 3 <= c <= 5
     return 0 <= r <= 2 and 3 <= c <= 5
 
@@ -58,13 +59,13 @@ def palace_contains(color: Color, pos: Pos) -> bool:
 def on_own_side_of_river(color: Color, pos: Pos) -> bool:
     r, _ = pos
     # River is between rows 4 and 5 (0-indexed)
-    if color is Color.RED:
+    if color == Color.RED:
         return r >= 5
     return r <= 4
 
 
 def soldier_forward_delta(color: Color) -> int:
-    return -1 if color is Color.RED else 1
+    return -1 if color == Color.RED else 1
 
 
 def initial_setup_piece_at(pos: Pos) -> Optional[Piece]:
@@ -149,7 +150,7 @@ def find_general(board_get, color: Color) -> Optional[Pos]:
     for r in range(BOARD_ROWS):
         for c in range(BOARD_COLS):
             p = board_get((r, c))
-            if p is not None and p.color is color and p.kind is PieceType.GENERAL:
+            if p is not None and p.color == color and p.kind == PieceType.GENERAL:
                 return (r, c)
     return None
 

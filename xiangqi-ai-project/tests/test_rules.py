@@ -1,7 +1,15 @@
 import unittest
 
 from core.board import Board
-from core.move_generator import legal_moves
+from core.move import Move
+from core.move_generator import (
+    assert_legal_move,
+    get_winner,
+    is_check,
+    is_legal_move,
+    is_terminal,
+    legal_moves,
+)
 from core.rules import Color, Piece, PieceType
 from core.state import GameState
 
@@ -137,6 +145,67 @@ class TestElephantCannonSoldier(unittest.TestCase):
         self.assertIn(((4, 4), (4, 3)), t2)
         self.assertIn(((4, 4), (4, 5)), t2)
         self.assertNotIn(((4, 4), (5, 4)), t2)  # cannot go backward
+
+
+class TestTerminalWinner(unittest.TestCase):
+    def test_not_terminal_in_normal_state(self):
+        s = mk_state(Color.RED)
+        self.assertFalse(is_terminal(s))
+        self.assertIsNone(get_winner(s))
+
+    def test_terminal_when_general_missing(self):
+        s = GameState(board=Board.empty(), side_to_move=Color.RED)
+        # Only keep black general -> red has "lost general"
+        s.board.set((0, 4), Piece(Color.BLACK, PieceType.GENERAL))
+        self.assertTrue(is_terminal(s))
+        self.assertEqual(get_winner(s), Color.BLACK)
+
+
+class TestIllegalMoveValidation(unittest.TestCase):
+    def test_reject_move_to_own_piece(self):
+        s = mk_state(Color.RED, blocker_pos=(2, 4))
+        s.board.set((5, 4), Piece(Color.RED, PieceType.ROOK))
+        s.board.set((5, 5), Piece(Color.RED, PieceType.SOLDIER))
+        mv = (5, 4), (5, 5)
+        self.assertFalse(is_legal_move(s, Move(*mv)))
+        with self.assertRaises(ValueError):
+            assert_legal_move(s, Move(*mv))
+
+
+class TestBasicCheck(unittest.TestCase):
+    def test_rook_gives_check(self):
+        s = mk_state(Color.RED, blocker_pos=None)
+        # Black rook on same file, unobstructed -> red is in check.
+        s.board.set((5, 4), Piece(Color.BLACK, PieceType.ROOK))
+        self.assertTrue(is_check(s, Color.RED))
+
+    def test_cannon_gives_check_with_one_screen(self):
+        s = mk_state(Color.RED, blocker_pos=None)
+        s.board.set((5, 4), Piece(Color.BLACK, PieceType.CANNON))
+        s.board.set((7, 4), Piece(Color.RED, PieceType.SOLDIER))  # screen
+        self.assertTrue(is_check(s, Color.RED))
+
+    def test_horse_gives_check_if_leg_free(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        # Put black horse so that it attacks (9,4): from (7,3) -> (9,4) with leg at (8,3)
+        s.board.set((7, 3), Piece(Color.BLACK, PieceType.HORSE))
+        self.assertTrue(is_check(s, Color.RED))
+
+        # Block the leg -> no check.
+        s2 = mk_state(Color.RED, blocker_pos=(4, 4))
+        s2.board.set((7, 3), Piece(Color.BLACK, PieceType.HORSE))
+        s2.board.set((8, 3), Piece(Color.RED, PieceType.SOLDIER))  # leg block
+        self.assertFalse(is_check(s2, Color.RED))
+
+    def test_soldier_gives_check_forward(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        s.board.set((8, 4), Piece(Color.BLACK, PieceType.SOLDIER))
+        self.assertTrue(is_check(s, Color.RED))
+
+    def test_facing_generals_counts_as_check(self):
+        s = mk_state(Color.RED, blocker_pos=None)
+        self.assertTrue(is_check(s, Color.RED))
+        self.assertTrue(is_check(s, Color.BLACK))
 
 
 if __name__ == "__main__":

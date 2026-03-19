@@ -1,7 +1,8 @@
 import unittest
 from core.state import GameState
 from core.move import Move
-from core.rules import Color, Pos, PieceType
+from core.board import Board
+from core.rules import Color, Piece, PieceType
 
 class TestGameState(unittest.TestCase):
     def setUp(self):
@@ -60,6 +61,13 @@ class TestGameState(unittest.TestCase):
         
         self.assertIsNotNone(self.state.board.get((9, 4)))
         self.assertIsNone(cloned_state.board.get((9, 4)))
+
+    def test_is_terminal_not_triggered_by_facing_generals(self):
+        s = GameState(board=Board.empty(), side_to_move=Color.RED)
+        s.board.set((9, 4), Piece(Color.RED, PieceType.GENERAL))
+        s.board.set((0, 4), Piece(Color.BLACK, PieceType.GENERAL))
+        # "Tướng đối mặt" là trạng thái không hợp lệ, nhưng không phải terminal ở cấp GameState.
+        self.assertFalse(s.is_terminal())
 
 if __name__ == '__main__':
     unittest.main()

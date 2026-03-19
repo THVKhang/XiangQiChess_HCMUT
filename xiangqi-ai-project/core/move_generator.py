@@ -228,3 +228,64 @@ def result_if_terminal(state: GameState) -> Optional[GameResult]:
         return GameResult(winner=stm.other, reason="checkmate")
     return GameResult(winner=None, reason="stalemate")
 
+
+def is_terminal(state: GameState) -> bool:
+    """
+    Trả về True nếu ván cờ đã kết thúc theo tiêu chí tối thiểu:
+    - một bên mất tướng, hoặc
+    - bên tới lượt không còn nước đi hợp lệ (checkmate/stalemate).
+    """
+    red_g = find_general(state.board.get, Color.RED)
+    black_g = find_general(state.board.get, Color.BLACK)
+    if red_g is None or black_g is None:
+        return True
+    return result_if_terminal(state) is not None
+
+
+def get_winner(state: GameState) -> Optional[Color]:
+    """
+    Trả về màu thắng nếu terminal và có người thắng.
+    - Nếu một bên mất tướng: bên còn tướng thắng.
+    - Nếu checkmate: theo result_if_terminal.
+    - Stalemate hoặc trạng thái không terminal: None.
+    """
+    red_g = find_general(state.board.get, Color.RED)
+    black_g = find_general(state.board.get, Color.BLACK)
+    if red_g is None and black_g is None:
+        return None
+    if red_g is None:
+        return Color.BLACK
+    if black_g is None:
+        return Color.RED
+    res = result_if_terminal(state)
+    return None if res is None else res.winner
+
+
+def is_legal_move(state: GameState, move: Move) -> bool:
+    """
+    Kiểm tra một nước đi có hợp lệ trong trạng thái hiện tại không.
+    Lưu ý: hàm này dùng để validate input (UI/engine), không dùng cho sinh nước đi.
+    """
+    sp = state.board.get(move.src)
+    if sp is None:
+        return False
+    if sp.color is not state.side_to_move:
+        return False
+    if not in_bounds(move.src) or not in_bounds(move.dst):
+        return False
+    tp = state.board.get(move.dst)
+    if tp is not None and tp.color is sp.color:
+        return False
+
+    # So khớp theo (src, dst). capture trong Move chỉ là metadata; không bắt buộc khớp.
+    for m in legal_moves(state):
+        if m.src == move.src and m.dst == move.dst:
+            return True
+    return False
+
+
+def assert_legal_move(state: GameState, move: Move) -> None:
+    """Raise ValueError nếu move không hợp lệ."""
+    if not is_legal_move(state, move):
+        raise ValueError(f"Illegal move for {state.side_to_move}: {move!r}")
+

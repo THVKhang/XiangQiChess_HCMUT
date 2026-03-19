@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from .board import Board
 from .move import Move
-from .rules import Color, Piece, Pos, find_general, generals_face_each_other
+from .rules import Color, Piece, Pos, find_general
 
 
 @dataclass(slots=True)
@@ -68,8 +68,4 @@ class GameState:
         
         if red_gen is None or black_gen is None:
             return True
-            
-        if generals_face_each_other(self.board.get, red_gen, black_gen):
-            return True
-            
         return False
