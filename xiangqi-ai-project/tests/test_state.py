@@ -68,6 +68,35 @@ class TestGameState(unittest.TestCase):
         s.board.set((0, 4), Piece(Color.BLACK, PieceType.GENERAL))
         # "Tướng đối mặt" là trạng thái không hợp lệ, nhưng không phải terminal ở cấp GameState.
         self.assertFalse(s.is_terminal())
+    # tests/test_state.py
+
+    def test_game_over_checkmate(self):
+        """Khoa tự đảm bảo test case của mình phản ánh đúng trạng thái bí"""
+        from core.board import Board
+        from core.rules import Piece, Color, PieceType
+        
+        # Tạo thế cờ bí: Tướng đỏ (9,4) bị 2 xe đen khóa chặt
+        self.state.board = Board.empty()
+        self.state.board.set((9, 4), Piece(Color.RED, PieceType.GENERAL))
+        self.state.board.set((9, 0), Piece(Color.BLACK, PieceType.ROOK)) # Chiếu ngang
+        self.state.board.set((0, 4), Piece(Color.BLACK, PieceType.ROOK)) # Chiếu dọc
+        self.state.side_to_move = Color.RED
+        
+        # Nếu hàm của Khoa trả về True, nghĩa là phần của Khoa đã đúng
+        self.assertTrue(self.state.is_terminal())
+        self.assertEqual(len(self.state.get_legal_moves()), 0)
+
+    def test_ai_search_compatibility(self):
+        """Test tích hợp: Đảm bảo AI của Khánh có thể sử dụng State của Khoa"""
+        # Thử clone và apply move nhiều lần như cách AI hoạt động
+        cloned = self.state.clone()
+        moves = cloned.get_legal_moves()
+        if moves:
+            undo = cloned.apply_move(moves[0])
+            self.assertNotEqual(cloned.side_to_move, self.state.side_to_move)
+            cloned.undo_move(undo)
+            # Sau khi undo, board của bản clone phải quay về trạng thái ban đầu
+            self.assertEqual(cloned.board.get(moves[0].src), self.state.board.get(moves[0].src))
 
 if __name__ == '__main__':
     unittest.main()
