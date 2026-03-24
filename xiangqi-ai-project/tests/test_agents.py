@@ -7,7 +7,7 @@ def test_minimax_agent():
     # Khởi tạo Minimax với độ sâu nhỏ để test nhanh
     agent = MinimaxAgent(player_id=Color.RED, depth=2)
     
-    move = agent.get_action(state)
+    move = agent.select_move(state)
     
     # Ở state ban đầu, nước đi không thể là None
     assert move is not None
@@ -19,7 +19,7 @@ def test_alphabeta_agent():
     # Khởi tạo AlphaBeta với độ sâu lớn hơn chút xíu để thấy prune
     agent = AlphaBetaAgent(player_id=Color.RED, depth=3)
     
-    move = agent.get_action(state)
+    move = agent.select_move(state)
     
     assert move is not None
     print(f"AlphaBeta decided: {move}")
@@ -32,8 +32,8 @@ def test_agent_consistency():
     agent1 = MinimaxAgent(player_id=Color.RED, depth=2)
     agent2 = AlphaBetaAgent(player_id=Color.RED, depth=2)
     
-    move1 = agent1.get_action(state.clone())
-    move2 = agent2.get_action(state.clone())
+    move1 = agent1.select_move(state.clone())
+    move2 = agent2.select_move(state.clone())
     
     assert move1 is not None
     assert move2 is not None

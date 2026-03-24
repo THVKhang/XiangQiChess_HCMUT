@@ -10,7 +10,7 @@ class MinimaxAgent(BaseAgent):
         super().__init__(player_id)
         self.depth = depth
 
-    def get_action(self, state):
+    def select_move(self, state):
         best_move = None
         best_score = float('-inf')
 
@@ -75,7 +75,7 @@ class AlphaBetaAgent(BaseAgent):
         super().__init__(player_id)
         self.depth = depth
 
-    def get_action(self, state):
+    def select_move(self, state):
         best_move = None
         best_score = float('-inf')
         alpha = float('-inf')
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     
     print("Đang tìm nhánh bằng Minimax...")
     start_time = time.time()
-    move = agent.get_action(st)
+    move = agent.select_move(st)
     end_time = time.time()
     
     print(f"Hoàn tất! Thuật toán đã chọn nước đi: {move}")
