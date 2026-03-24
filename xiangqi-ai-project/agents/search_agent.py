@@ -5,6 +5,41 @@ from agents.base_agent import BaseAgent
 from core.move_generator import legal_moves
 from core.state import GameState
 from core.move import Move
+from core.rules import PieceType, on_own_side_of_river
+
+# Bảng giá trị cơ bản của các quân cờ
+PIECE_VALUES = {
+    PieceType.GENERAL: 10000,
+    PieceType.ROOK: 900,
+    PieceType.CANNON: 450,
+    PieceType.HORSE: 400,
+    PieceType.ELEPHANT: 200,
+    PieceType.ADVISOR: 200,
+    PieceType.SOLDIER: 100
+}
+
+def evaluate_state(state: GameState, player_id):
+    """
+    Hàm lượng giá (Heuristic bản 1: giá trị quân) đánh giá chất lượng của một trạng thái bàn cờ.
+    """
+    score = 0
+    for pos, piece in state.board.squares():
+        if piece is None:
+            continue
+        
+        val = PIECE_VALUES.get(piece.kind, 0)
+        
+        # Khuyến khích Tốt qua sông
+        if piece.kind == PieceType.SOLDIER:
+            if not on_own_side_of_river(piece.color, pos):
+                val += 100  # Tốt qua sông có giá trị cao hơn
+                
+        if piece.color == player_id:
+            score += val
+        else:
+            score -= val
+            
+    return score
 
 class MinimaxAgent(BaseAgent):
     """
@@ -64,11 +99,7 @@ class MinimaxAgent(BaseAgent):
             return best_score
 
     def evaluate(self, state):
-        """
-        Hàm lượng giá (Heuristic function) đánh giá chất lượng của một trạng thái bàn cờ.
-        """
-        score = 0
-        return score
+        return evaluate_state(state, self.player_id)
 
 
 class AlphaBetaAgent(BaseAgent):
@@ -133,11 +164,7 @@ class AlphaBetaAgent(BaseAgent):
             return best_score
 
     def evaluate(self, state):
-        """
-        Hàm lượng giá (Heuristic function) đánh giá chất lượng của một trạng thái bàn cờ.
-        """
-        score = 0
-        return score
+        return evaluate_state(state, self.player_id)
 
 if __name__ == "__main__":
     from core.state import GameState
