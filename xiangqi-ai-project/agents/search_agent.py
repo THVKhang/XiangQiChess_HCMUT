@@ -219,29 +219,49 @@ class AlphaBetaAgent(BaseAgent):
     def evaluate(self, state):
         return advanced_evaluate(state, self.player_id)
 
-class EasyAgent(AlphaBetaAgent):
-    """Độ khó Dễ: Depth = 1, heuristic cơ bản (Mức độ 1)"""
-    def __init__(self, player_id, name="EasyAgent"):
-        super().__init__(player_id, name=name, depth=1, use_move_ordering=False)
+def get_level_config(level: int):
+    # Trả về: (depth, use_advanced_heuristic, use_move_ordering)
+    configs = {
+        1: (1, False, False),
+        2: (1, True, False),
+        3: (2, False, False),
+        4: (2, True, False),
+        5: (2, True, True),
+        6: (3, False, False),
+        7: (3, True, False),
+        8: (3, True, True),
+        9: (4, True, False),
+        10: (4, True, True),
+    }
+    return configs[max(1, min(10, level))]
+
+class LevelAgent(AlphaBetaAgent):
+    """Agent có định mức kỹ năng từ 1-10 (poor -> good)"""
+    def __init__(self, player_id, level=1, name=None):
+        self.level = max(1, min(10, level))
+        depth, self.use_advanced, use_ord = get_level_config(self.level)
+        agent_name = name or f"LevelAgent(Lvl {self.level})"
+        super().__init__(player_id, name=agent_name, depth=depth, use_move_ordering=use_ord)
         
     def evaluate(self, state):
+        if self.use_advanced:
+            return advanced_evaluate(state, self.player_id)
         return basic_evaluate(state, self.player_id)
 
-class MediumAgent(AlphaBetaAgent):
-    """Độ khó Trung bình: Depth = 2, heuristic nâng cao (Qua sông) (Mức độ 2)"""
+class EasyAgent(LevelAgent):
+    """Bí danh cho Level 1 (Kém nhất)"""
+    def __init__(self, player_id, name="EasyAgent"):
+        super().__init__(player_id, level=1, name=name)
+
+class MediumAgent(LevelAgent):
+    """Bí danh cho Level 4 (Trung bình)"""
     def __init__(self, player_id, name="MediumAgent"):
-        super().__init__(player_id, name=name, depth=2, use_move_ordering=False)
+        super().__init__(player_id, level=4, name=name)
 
-    def evaluate(self, state):
-        return advanced_evaluate(state, self.player_id)
-
-class HardAgent(AlphaBetaAgent):
-    """Độ khó Khó: Depth = 3, heuristic nâng cao + Move Ordering (Mức độ 3)"""
+class HardAgent(LevelAgent):
+    """Bí danh cho Level 8 (Xuất sắc)"""
     def __init__(self, player_id, name="HardAgent"):
-        super().__init__(player_id, name=name, depth=3, use_move_ordering=True)
-
-    def evaluate(self, state):
-        return advanced_evaluate(state, self.player_id)
+        super().__init__(player_id, level=8, name=name)
 
 if __name__ == "__main__":
     from core.state import GameState
@@ -250,13 +270,13 @@ if __name__ == "__main__":
     print("Khởi tạo bàn cờ giả (trạng thái ban đầu)...")
     st = GameState()
     
-    print("Khởi tạo MediumAgent (độ sâu = 2)...")
-    agent = MediumAgent(player_id=Color.RED)
+    print("Khởi tạo LevelAgent(level=5)...")
+    agent = LevelAgent(player_id=Color.RED, level=5)
     
-    print("Đang tìm nhánh bằng AlphaBeta...")
+    print(f"Đang tìm nhánh bằng {agent.name} (Depth {agent.depth}, Ord: {agent.use_move_ordering})...")
     start_time = time.time()
     move = agent.select_move(st)
     end_time = time.time()
     
     print(f"Hoàn tất! Thuật toán đã chọn nước đi: {move}")
-    print(f"Thời gian chạy bộ khung AlphaBeta Medium: {end_time - start_time:.4f} giây")
+    print(f"Thời gian chạy bộ khung {agent.name}: {end_time - start_time:.4f} giây")
