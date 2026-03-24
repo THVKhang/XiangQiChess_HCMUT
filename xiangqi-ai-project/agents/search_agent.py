@@ -72,6 +72,12 @@ def advanced_evaluate(state: GameState, player_id):
         elif piece.kind == PieceType.ROOK:
             if c in (2, 4, 6): val += 15     # Xe đóng ở các trục quan trọng
             
+        # 5. Tướng và Sĩ, Tượng phòng thủ
+        elif piece.kind == PieceType.GENERAL:
+            if c != 4: val -= 20             # Tướng rời khỏi trục 4 rất nguy hiểm
+        elif piece.kind in (PieceType.ADVISOR, PieceType.ELEPHANT):
+            if c == 4: val += 10             # Thường tụ về giữa cung để bảo vệ
+            
         if piece.color == player_id:
             score += val
         else:
@@ -137,7 +143,7 @@ class MinimaxAgent(BaseAgent):
             return best_score
 
     def evaluate(self, state):
-        return evaluate_state(state, self.player_id)
+        return basic_evaluate(state, self.player_id)
 
 
 class AlphaBetaAgent(BaseAgent):
@@ -148,6 +154,8 @@ class AlphaBetaAgent(BaseAgent):
         super().__init__(player_id, name)
         self.depth = depth
         self.use_move_ordering = use_move_ordering
+        self.ttable = {}
+        self.eval_cache = {}
 
     def order_moves(self, state, moves):
         if not self.use_move_ordering:
@@ -156,12 +164,20 @@ class AlphaBetaAgent(BaseAgent):
         def move_score(move):
             target_piece = state.board.get(move.dst)
             if target_piece is not None:
-                return PIECE_VALUES.get(target_piece.kind, 0)
+                # MVV-LVA: Most Valuable Victim - Least Valuable Attacker
+                # Ưu tiên bắt quân to bằng quân nhỏ (VD: Tốt ăn Xe ngon hơn Xe ăn Xe)
+                attacker_piece = state.board.get(move.src)
+                attacker_val = PIECE_VALUES.get(attacker_piece.kind, 0) if attacker_piece else 0
+                target_val = PIECE_VALUES.get(target_piece.kind, 0)
+                return 10000 + target_val - attacker_val
             return 0
             
         return sorted(moves, key=move_score, reverse=True)
 
     def select_move(self, state: GameState) -> Optional[Move]:
+        self.ttable.clear()    # Xoá cache để tránh tràn RAM qua nhiều nước đi
+        self.eval_cache.clear()
+
         best_move = None
         best_score = float('-inf')
         alpha = float('-inf')
@@ -184,14 +200,45 @@ class AlphaBetaAgent(BaseAgent):
                     
         return best_move
 
+    def get_state_hash(self, state):
+        # Băm trạng thái bàn cờ hiện tại dựa trên toạ độ, loại quân và phe
+        return frozenset((pos, piece.kind, piece.color) for pos, piece in state.board.squares() if piece is not None)
+
+    def cached_evaluate(self, state):
+        # Bộ đệm giúp không phải for-loop toàn bàn cờ nhiều lần cho cùng 1 trạng thái
+        state_hash = self.get_state_hash(state)
+        if state_hash in self.eval_cache:
+            return self.eval_cache[state_hash]
+        val = self.evaluate(state)
+        self.eval_cache[state_hash] = val
+        return val
+
     def alpha_beta(self, state, depth, alpha, beta, is_maximizing_player):
+        state_hash = self.get_state_hash(state)
+        tt_key = (state_hash, depth, is_maximizing_player)
+        
+        # Tra cứu Transposition Table (Zobrist caching thu nhỏ)
+        if tt_key in self.ttable:
+            tt_entry = self.ttable[tt_key]
+            if tt_entry['flag'] == 'EXACT':
+                return tt_entry['value']
+            elif tt_entry['flag'] == 'LOWERBOUND':
+                alpha = max(alpha, tt_entry['value'])
+            elif tt_entry['flag'] == 'UPPERBOUND':
+                beta = min(beta, tt_entry['value'])
+            
+            if alpha >= beta:
+                return tt_entry['value']
+
+        original_alpha = alpha
+
         if depth == 0 or state.is_terminal():
-            return self.evaluate(state)
+            return self.cached_evaluate(state)
 
         moves = legal_moves(state)
         moves = self.order_moves(state, moves)
         if not moves:
-            return self.evaluate(state)
+            return self.cached_evaluate(state)
 
         if is_maximizing_player:
             best_score = float('-inf')
@@ -202,8 +249,7 @@ class AlphaBetaAgent(BaseAgent):
                 best_score = max(best_score, score)
                 alpha = max(alpha, best_score)
                 if beta <= alpha:
-                    break   # Cắt tỉa Beta
-            return best_score
+                    break
         else:
             best_score = float('inf')
             for move in moves:
@@ -213,8 +259,18 @@ class AlphaBetaAgent(BaseAgent):
                 best_score = min(best_score, score)
                 beta = min(beta, best_score)
                 if beta <= alpha:
-                    break   # Cắt tỉa Alpha
-            return best_score
+                    break
+
+        # Ghi nhận vào Transposition Table
+        if best_score <= original_alpha:
+            flag = 'UPPERBOUND'
+        elif best_score >= beta:
+            flag = 'LOWERBOUND'
+        else:
+            flag = 'EXACT'
+            
+        self.ttable[tt_key] = {'value': best_score, 'flag': flag}
+        return best_score
 
     def evaluate(self, state):
         return advanced_evaluate(state, self.player_id)
@@ -237,8 +293,9 @@ def get_level_config(level: int):
 
 class LevelAgent(AlphaBetaAgent):
     """Agent có định mức kỹ năng từ 1-10 (poor -> good)"""
-    def __init__(self, player_id, level=1, name=None):
+    def __init__(self, player_id, algorithm: str = "alphabeta", level=1, name=None):
         self.level = max(1, min(10, level))
+        self.algorithm = algorithm.lower()
         depth, self.use_advanced, use_ord = get_level_config(self.level)
         agent_name = name or f"LevelAgent(Lvl {self.level})"
         super().__init__(player_id, name=agent_name, depth=depth, use_move_ordering=use_ord)
@@ -248,20 +305,30 @@ class LevelAgent(AlphaBetaAgent):
             return advanced_evaluate(state, self.player_id)
         return basic_evaluate(state, self.player_id)
 
+    def select_move(self, state: GameState) -> Optional[Move]:
+        if self.algorithm == "minimax":
+            # Delegate sang thuật toán Minimax (dành cho mục đích so sánh/báo cáo)
+            minimax_agent = MinimaxAgent(player_id=self.player_id, name=self.name, depth=self.depth)
+            # Ép MinimaxAgent tự dùng bộ lượng giá và Heuristic của LevelAgent
+            minimax_agent.evaluate = self.evaluate
+            return minimax_agent.select_move(state)
+        # Mặc định dùng Alpha-Beta đã tối ưu
+        return super().select_move(state)
+
 class EasyAgent(LevelAgent):
     """Bí danh cho Level 1 (Kém nhất)"""
-    def __init__(self, player_id, name="EasyAgent"):
-        super().__init__(player_id, level=1, name=name)
+    def __init__(self, player_id, algorithm: str = "alphabeta", name="EasyAgent"):
+        super().__init__(player_id, algorithm, level=1, name=name)
 
 class MediumAgent(LevelAgent):
     """Bí danh cho Level 4 (Trung bình)"""
-    def __init__(self, player_id, name="MediumAgent"):
-        super().__init__(player_id, level=4, name=name)
+    def __init__(self, player_id, algorithm: str = "alphabeta", name="MediumAgent"):
+        super().__init__(player_id, algorithm, level=4, name=name)
 
 class HardAgent(LevelAgent):
     """Bí danh cho Level 8 (Xuất sắc)"""
-    def __init__(self, player_id, name="HardAgent"):
-        super().__init__(player_id, level=8, name=name)
+    def __init__(self, player_id, algorithm: str = "alphabeta", name="HardAgent"):
+        super().__init__(player_id, algorithm, level=8, name=name)
 
 if __name__ == "__main__":
     from core.state import GameState
@@ -270,13 +337,16 @@ if __name__ == "__main__":
     print("Khởi tạo bàn cờ giả (trạng thái ban đầu)...")
     st = GameState()
     
-    print("Khởi tạo LevelAgent(level=5)...")
-    agent = LevelAgent(player_id=Color.RED, level=5)
+    print("\nKhởi tạo LevelAgent(level=3, algorithm='minimax')...")
+    agent_mn = LevelAgent(player_id=Color.RED, algorithm="minimax", level=3)
+    start_time_1 = time.time()
+    move_mn = agent_mn.select_move(st)
+    end_time_1 = time.time()
+    print(f"[{agent_mn.name} | MINIMAX] Nước đi: {move_mn} - Thời gian: {end_time_1 - start_time_1:.4f} giây")
     
-    print(f"Đang tìm nhánh bằng {agent.name} (Depth {agent.depth}, Ord: {agent.use_move_ordering})...")
-    start_time = time.time()
-    move = agent.select_move(st)
-    end_time = time.time()
-    
-    print(f"Hoàn tất! Thuật toán đã chọn nước đi: {move}")
-    print(f"Thời gian chạy bộ khung {agent.name}: {end_time - start_time:.4f} giây")
+    print("\nKhởi tạo LevelAgent(level=3, algorithm='alphabeta')...")
+    agent_ab = LevelAgent(player_id=Color.RED, algorithm="alphabeta", level=3)
+    start_time_2 = time.time()
+    move_ab = agent_ab.select_move(st)
+    end_time_2 = time.time()
+    print(f"[{agent_ab.name} | ALPHA-BETA] Nước đi: {move_ab} - Thời gian: {end_time_2 - start_time_2:.4f} giây")
