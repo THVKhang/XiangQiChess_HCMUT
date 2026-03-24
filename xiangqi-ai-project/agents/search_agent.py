@@ -1,16 +1,20 @@
 import time
+from typing import Optional
+
 from agents.base_agent import BaseAgent
 from core.move_generator import legal_moves
+from core.state import GameState
+from core.move import Move
 
 class MinimaxAgent(BaseAgent):
     """
     Agent sử dụng thuật toán Minimax cơ bản (không cắt tỉa) để chọn nước đi.
     """
-    def __init__(self, player_id, depth=3):
-        super().__init__(player_id)
+    def __init__(self, player_id, name="MinimaxAgent", depth=3):
+        super().__init__(player_id, name)
         self.depth = depth
 
-    def select_move(self, state):
+    def select_move(self, state: GameState) -> Optional[Move]:
         best_move = None
         best_score = float('-inf')
 
@@ -71,11 +75,11 @@ class AlphaBetaAgent(BaseAgent):
     """
     Agent sử dụng thuật toán Alpha-Beta Pruning để chọn nước đi tối ưu hơn.
     """
-    def __init__(self, player_id, depth=3):
-        super().__init__(player_id)
+    def __init__(self, player_id, name="AlphaBetaAgent", depth=3):
+        super().__init__(player_id, name)
         self.depth = depth
 
-    def select_move(self, state):
+    def select_move(self, state: GameState) -> Optional[Move]:
         best_move = None
         best_score = float('-inf')
         alpha = float('-inf')

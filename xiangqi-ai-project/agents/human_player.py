@@ -1,8 +1,8 @@
 from __future__ import annotations
-
-from dataclasses import dataclass
+    
 from typing import Callable, Optional
 
+from agents.base_agent import BaseAgent
 from core.move import Move
 from core.move_generator import legal_moves
 from core.state import GameState
@@ -10,14 +10,13 @@ from core.state import GameState
 InputFunc = Callable[[str], str]
 OutputFunc = Callable[[str], None]
 
-
-@dataclass(slots=True)
-class HumanPlayer:
+class HumanPlayer(BaseAgent):
     """Người chơi nhập nước đi từ terminal theo dạng: r1 c1 r2 c2"""
 
-    name: str = "HumanPlayer"
-    input_func: InputFunc = input
-    output_func: OutputFunc = print
+    def __init__(self, player_id, name: str = "HumanPlayer", input_func: InputFunc = input, output_func: OutputFunc = print):
+        super().__init__(player_id, name)
+        self.input_func = input_func
+        self.output_func = output_func
 
     def select_move(self, state: GameState) -> Optional[Move]:
         moves = legal_moves(state)

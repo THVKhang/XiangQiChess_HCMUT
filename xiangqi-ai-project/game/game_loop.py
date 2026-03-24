@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from agents.base_agent import Agent
+from agents.base_agent import BaseAgent
 from core.move import Move
 from core.move_generator import assert_legal_move, get_winner, is_terminal, result_if_terminal
 from core.rules import Color
@@ -31,17 +31,17 @@ class GameLoop:
 
     def __init__(
         self,
-        red_agent: Agent,
-        black_agent: Agent,
+        red_agent: BaseAgent,
+        black_agent: BaseAgent,
         state: Optional[GameState] = None,
         max_turns: int = 200,
     ) -> None:
         self.red_agent = red_agent
         self.black_agent = black_agent
-        self.state = state.copy() if state is not None else GameState()
+        self.state = state.clone() if state is not None else GameState()
         self.max_turns = max_turns
 
-    def current_agent(self) -> Agent:
+    def current_agent(self) -> BaseAgent:
         return self.red_agent if self.state.side_to_move == Color.RED else self.black_agent
 
     def play(self) -> GameLoopResult:
@@ -66,12 +66,12 @@ class GameLoop:
 
             agent = self.current_agent()
             side = self.state.side_to_move
-            move = agent.select_move(self.state.copy())
+            move = agent.select_move(self.state.clone())
             history.append(
                 TurnRecord(
                     ply=ply,
                     side=side,
-                    agent_name=getattr(agent, "name", agent.__class__.__name__),
+                    agent_name=agent.name,
                     move=move,
                 )
             )
@@ -96,8 +96,8 @@ class GameLoop:
 
 
 def run_game(
-    red_agent: Agent,
-    black_agent: Agent,
+    red_agent: BaseAgent,
+    black_agent: BaseAgent,
     state: Optional[GameState] = None,
     max_turns: int = 200,
 ) -> GameLoopResult:

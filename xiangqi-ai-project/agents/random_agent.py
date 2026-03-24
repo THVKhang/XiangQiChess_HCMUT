@@ -12,8 +12,7 @@ class RandomAgent(BaseAgent):
     """Agent chọn ngẫu nhiên một nước đi hợp lệ."""
 
     def __init__(self, player_id, name: str = "RandomAgent", rng: Optional[random.Random] = None):
-        super().__init__(player_id)
-        self.name = name
+        super().__init__(player_id, name)
         self.rng = rng if rng is not None else random.Random()
 
     def select_move(self, state: GameState) -> Optional[Move]:
