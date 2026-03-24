@@ -1,51 +1,48 @@
 from core.state import GameState
 from core.rules import Color
-from agents.search_agent import MinimaxAgent, AlphaBetaAgent
+from agents.search_agent import EasyAgent, MediumAgent, HardAgent
 
-def test_minimax_agent():
+def test_easy_agent():
     state = GameState()
-    # Khởi tạo Minimax với độ sâu nhỏ để test nhanh
-    agent = MinimaxAgent(player_id=Color.RED, depth=2)
-    
+    agent = EasyAgent(player_id=Color.RED)
     move = agent.select_move(state)
-    
-    # Ở state ban đầu, nước đi không thể là None
     assert move is not None
-    print(f"Minimax decided: {move}")
+    print(f"EasyAgent decided: {move}")
 
-
-def test_alphabeta_agent():
+def test_medium_agent():
     state = GameState()
-    # Khởi tạo AlphaBeta với độ sâu lớn hơn chút xíu để thấy prune
-    agent = AlphaBetaAgent(player_id=Color.RED, depth=3)
-    
+    agent = MediumAgent(player_id=Color.RED)
     move = agent.select_move(state)
-    
     assert move is not None
-    print(f"AlphaBeta decided: {move}")
+    print(f"MediumAgent decided: {move}")
 
+def test_hard_agent():
+    state = GameState()
+    agent = HardAgent(player_id=Color.RED)
+    move = agent.select_move(state)
+    assert move is not None
+    print(f"HardAgent decided: {move}")
 
 def test_agent_consistency():
     state = GameState()
-    # Vì evaluate trả về 0 hết nên có thể 2 agent chọn 2 nước đi khác nhau
-    # Tuy nhiên, ta vẫn test để đảm bảo chúng không bị crash
-    agent1 = MinimaxAgent(player_id=Color.RED, depth=2)
-    agent2 = AlphaBetaAgent(player_id=Color.RED, depth=2)
+    # Kiểm tra xem các agent có thực thị select_move hợp lệ từ state không
+    agent1 = EasyAgent(player_id=Color.RED)
+    agent2 = MediumAgent(player_id=Color.RED)
+    agent3 = HardAgent(player_id=Color.RED)
     
-    move1 = agent1.select_move(state.clone())
-    move2 = agent2.select_move(state.clone())
-    
-    assert move1 is not None
-    assert move2 is not None
-    # Lưu ý: Cả hai đều có thể trả về nước đi do đánh giá 0 đều ngang nhau
-    # Nên không nhất thiết phải assert move1 == move2, tuỳ thuộc thuật toán cắt tỉa.
+    assert agent1.select_move(state.clone()) is not None
+    assert agent2.select_move(state.clone()) is not None
+    assert agent3.select_move(state.clone()) is not None
 
 if __name__ == "__main__":
-    print("--- Running test_minimax_agent ---")
-    test_minimax_agent()
+    print("--- Running test_easy_agent ---")
+    test_easy_agent()
     
-    print("\n--- Running test_alphabeta_agent ---")
-    test_alphabeta_agent()
+    print("\n--- Running test_medium_agent ---")
+    test_medium_agent()
+    
+    print("\n--- Running test_hard_agent ---")
+    test_hard_agent()
     
     print("\n--- Running test_agent_consistency ---")
     test_agent_consistency()

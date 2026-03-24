@@ -5,7 +5,7 @@ from agents.base_agent import BaseAgent
 from core.move_generator import legal_moves
 from core.state import GameState
 from core.move import Move
-from core.rules import PieceType, on_own_side_of_river
+from core.rules import Color, PieceType, on_own_side_of_river
 
 # Bảng giá trị cơ bản của các quân cờ
 PIECE_VALUES = {
@@ -18,22 +18,60 @@ PIECE_VALUES = {
     PieceType.SOLDIER: 100
 }
 
-def evaluate_state(state: GameState, player_id):
+def basic_evaluate(state: GameState, player_id):
     """
-    Hàm lượng giá (Heuristic bản 1: giá trị quân) đánh giá chất lượng của một trạng thái bàn cờ.
+    Hàm lượng giá cơ bản. Chỉ dựa vào giá trị quân.
+    """
+    score = 0
+    for pos, piece in state.board.squares():
+        if piece is None:
+            continue
+        val = PIECE_VALUES.get(piece.kind, 0)
+        if piece.color == player_id:
+            score += val
+        else:
+            score -= val
+    return score
+
+
+def advanced_evaluate(state: GameState, player_id):
+    """
+    Hàm lượng giá nâng cao (Heuristic bản 2: Giá trị quân + Vị trí chiến lược)
     """
     score = 0
     for pos, piece in state.board.squares():
         if piece is None:
             continue
         
+        r, c = pos
         val = PIECE_VALUES.get(piece.kind, 0)
         
-        # Khuyến khích Tốt qua sông
+        # 1. Tốt (Pawn)
         if piece.kind == PieceType.SOLDIER:
             if not on_own_side_of_river(piece.color, pos):
-                val += 100  # Tốt qua sông có giá trị cao hơn
-                
+                val += 100  # Tốt qua sông
+                # Thưởng nếu áp sát cung Tướng địch nhưng chưa bị lụt (xuống đáy)
+                # Đỏ đi từ hàng 9 -> 0, Đen đi từ 0 -> 9
+                if piece.color == Color.RED:
+                    if 1 <= r <= 2 and 3 <= c <= 5: val += 50
+                    elif r == 0: val -= 30
+                else:
+                    if 7 <= r <= 8 and 3 <= c <= 5: val += 50
+                    elif r == 9: val -= 30
+                    
+        # 2. Mã (Horse)
+        elif piece.kind == PieceType.HORSE:
+            if c == 0 or c == 8: val -= 20   # Mã biên bị giới hạn
+            elif 3 <= c <= 5: val += 20      # Mã trung tâm mạnh hơn
+
+        # 3. Pháo (Cannon)
+        elif piece.kind == PieceType.CANNON:
+            if c == 4: val += 30             # Pháo khống chế lộ giữa nguy hiểm
+
+        # 4. Xe (Rook)
+        elif piece.kind == PieceType.ROOK:
+            if c in (2, 4, 6): val += 15     # Xe đóng ở các trục quan trọng
+            
         if piece.color == player_id:
             score += val
         else:
@@ -106,9 +144,22 @@ class AlphaBetaAgent(BaseAgent):
     """
     Agent sử dụng thuật toán Alpha-Beta Pruning để chọn nước đi tối ưu hơn.
     """
-    def __init__(self, player_id, name="AlphaBetaAgent", depth=3):
+    def __init__(self, player_id, name="AlphaBetaAgent", depth=3, use_move_ordering=False):
         super().__init__(player_id, name)
         self.depth = depth
+        self.use_move_ordering = use_move_ordering
+
+    def order_moves(self, state, moves):
+        if not self.use_move_ordering:
+            return moves
+            
+        def move_score(move):
+            target_piece = state.board.get(move.dst)
+            if target_piece is not None:
+                return PIECE_VALUES.get(target_piece.kind, 0)
+            return 0
+            
+        return sorted(moves, key=move_score, reverse=True)
 
     def select_move(self, state: GameState) -> Optional[Move]:
         best_move = None
@@ -117,6 +168,7 @@ class AlphaBetaAgent(BaseAgent):
         beta = float('inf')
 
         moves = legal_moves(state)
+        moves = self.order_moves(state, moves)
         
         for move in moves:
             next_state = state.clone()
@@ -137,6 +189,7 @@ class AlphaBetaAgent(BaseAgent):
             return self.evaluate(state)
 
         moves = legal_moves(state)
+        moves = self.order_moves(state, moves)
         if not moves:
             return self.evaluate(state)
 
@@ -164,7 +217,31 @@ class AlphaBetaAgent(BaseAgent):
             return best_score
 
     def evaluate(self, state):
-        return evaluate_state(state, self.player_id)
+        return advanced_evaluate(state, self.player_id)
+
+class EasyAgent(AlphaBetaAgent):
+    """Độ khó Dễ: Depth = 1, heuristic cơ bản (Mức độ 1)"""
+    def __init__(self, player_id, name="EasyAgent"):
+        super().__init__(player_id, name=name, depth=1, use_move_ordering=False)
+        
+    def evaluate(self, state):
+        return basic_evaluate(state, self.player_id)
+
+class MediumAgent(AlphaBetaAgent):
+    """Độ khó Trung bình: Depth = 2, heuristic nâng cao (Qua sông) (Mức độ 2)"""
+    def __init__(self, player_id, name="MediumAgent"):
+        super().__init__(player_id, name=name, depth=2, use_move_ordering=False)
+
+    def evaluate(self, state):
+        return advanced_evaluate(state, self.player_id)
+
+class HardAgent(AlphaBetaAgent):
+    """Độ khó Khó: Depth = 3, heuristic nâng cao + Move Ordering (Mức độ 3)"""
+    def __init__(self, player_id, name="HardAgent"):
+        super().__init__(player_id, name=name, depth=3, use_move_ordering=True)
+
+    def evaluate(self, state):
+        return advanced_evaluate(state, self.player_id)
 
 if __name__ == "__main__":
     from core.state import GameState
@@ -173,14 +250,13 @@ if __name__ == "__main__":
     print("Khởi tạo bàn cờ giả (trạng thái ban đầu)...")
     st = GameState()
     
-    print("Khởi tạo MinimaxAgent (độ sâu = 2)...")
-    # Độ sâu 2 để test nhanh xem khung có chạy mượt mà không
-    agent = MinimaxAgent(player_id=Color.RED, depth=2)
+    print("Khởi tạo MediumAgent (độ sâu = 2)...")
+    agent = MediumAgent(player_id=Color.RED)
     
-    print("Đang tìm nhánh bằng Minimax...")
+    print("Đang tìm nhánh bằng AlphaBeta...")
     start_time = time.time()
     move = agent.select_move(st)
     end_time = time.time()
     
     print(f"Hoàn tất! Thuật toán đã chọn nước đi: {move}")
-    print(f"Thời gian chạy bộ khung MiniMax: {end_time - start_time:.4f} giây")
+    print(f"Thời gian chạy bộ khung AlphaBeta Medium: {end_time - start_time:.4f} giây")
