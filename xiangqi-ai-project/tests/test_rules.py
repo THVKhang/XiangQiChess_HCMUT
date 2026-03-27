@@ -1,3 +1,4 @@
+import random
 import unittest
 
 from core.board import Board
@@ -206,6 +207,128 @@ class TestBasicCheck(unittest.TestCase):
         s = mk_state(Color.RED, blocker_pos=None)
         self.assertTrue(is_check(s, Color.RED))
         self.assertTrue(is_check(s, Color.BLACK))
+
+
+class TestLongRunRules(unittest.TestCase):
+    def test_random_play_does_not_break_invariants(self):
+        rng = random.Random(20260327)
+        s = GameState()  # initial setup
+
+        for _ in range(400):
+            # Nếu terminal thì dừng (checkmate/stalemate hoặc mất tướng).
+            if is_terminal(s) or get_winner(s) is not None:
+                break
+
+            ms = legal_moves(s)
+            self.assertTrue(ms, "Non-terminal state must have legal moves")
+
+            m = rng.choice(ms)
+            assert_legal_move(s, Move(m.src, m.dst, capture=m.capture))
+
+            undo = s.apply_move(m)
+
+            # Sau khi đi xong, trạng thái không được là illegal (tự chiếu / tướng đối mặt).
+            self.assertFalse(is_check(s, s.side_to_move.other), "Move must not leave mover in check")
+
+            # Thỉnh thoảng undo để kiểm tra tính ổn định khi chạy dài.
+            if rng.random() < 0.1:
+                s.undo_move(undo)
+
+
+class TestLegalMoveFiltering(unittest.TestCase):
+    def test_move_exposing_check_is_filtered(self):
+        # Red rook is pinned: moving it away would expose check from black rook.
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        s.board.set((9, 8), Piece(Color.BLACK, PieceType.ROOK))
+        s.board.set((9, 6), Piece(Color.RED, PieceType.ROOK))  # pinned blocker
+
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+
+        # Moving the pinned rook off row 9 would expose red general -> illegal.
+        self.assertNotIn(((9, 6), (8, 6)), t)
+        self.assertNotIn(((9, 6), (7, 6)), t)
+
+    def test_flying_general_capture_when_clear(self):
+        # Two generals face each other with empty file: capture should be a legal move.
+        s = GameState(board=Board.empty(), side_to_move=Color.RED)
+        s.board.set((9, 4), Piece(Color.RED, PieceType.GENERAL))
+        s.board.set((0, 4), Piece(Color.BLACK, PieceType.GENERAL))
+
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertIn(((9, 4), (0, 4)), t)
+
+
+class TestEachPieceRules(unittest.TestCase):
+    def test_rook_cannot_jump(self):
+        s = mk_state(Color.RED, blocker_pos=(1, 4))
+        s.board.set((5, 0), Piece(Color.RED, PieceType.ROOK))
+        s.board.set((5, 2), Piece(Color.RED, PieceType.SOLDIER))  # block
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertIn(((5, 0), (5, 1)), t)
+        self.assertNotIn(((5, 0), (5, 3)), t)
+
+    def test_horse_can_capture_when_leg_free(self):
+        # Ensure leg squares are free (do not block at (4,4)),
+        # and keep file 4 blocked so moving the horse doesn't open facing generals.
+        s = mk_state(Color.RED, blocker_pos=(6, 4))
+        s.board.set((5, 4), Piece(Color.RED, PieceType.HORSE))
+        s.board.set((3, 3), Piece(Color.BLACK, PieceType.SOLDIER))  # capturable
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertIn(((5, 4), (3, 3)), t)
+
+    def test_elephant_can_capture_and_cannot_cross_river(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        s.board.set((9, 2), Piece(Color.RED, PieceType.ELEPHANT))
+        s.board.set((7, 4), Piece(Color.BLACK, PieceType.SOLDIER))  # capturable
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertIn(((9, 2), (7, 4)), t)
+
+        s2 = mk_state(Color.RED, blocker_pos=(4, 4))
+        s2.board.set((5, 2), Piece(Color.RED, PieceType.ELEPHANT))
+        ms2 = legal_moves(s2)
+        t2 = moves_as_tuples(ms2)
+        self.assertNotIn(((5, 2), (3, 4)), t2)  # would cross river
+
+    def test_advisor_only_diagonal_and_stays_in_palace(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        s.board.set((8, 4), Piece(Color.RED, PieceType.ADVISOR))
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertIn(((8, 4), (9, 3)), t)
+        self.assertIn(((8, 4), (9, 5)), t)
+        self.assertNotIn(((8, 4), (8, 5)), t)  # orthogonal
+        self.assertNotIn(((8, 4), (7, 2)), t)  # outside palace
+
+    def test_general_cannot_leave_palace(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        # Put general at (7,4) is inside palace, moving to (6,4) would leave palace -> illegal
+        s.board.set((9, 4), None)
+        s.board.set((7, 4), Piece(Color.RED, PieceType.GENERAL))
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertNotIn(((7, 4), (6, 4)), t)
+
+    def test_cannon_capture_requires_exactly_one_screen(self):
+        s = mk_state(Color.RED, blocker_pos=(4, 4))
+        s.board.set((7, 1), Piece(Color.RED, PieceType.CANNON))
+        s.board.set((6, 1), Piece(Color.RED, PieceType.SOLDIER))  # screen 1
+        s.board.set((5, 1), Piece(Color.BLACK, PieceType.SOLDIER))  # screen 2 (extra)
+        s.board.set((3, 1), Piece(Color.BLACK, PieceType.ROOK))  # target
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertNotIn(((7, 1), (3, 1)), t)  # 2 screens => cannot capture
+
+    def test_soldier_cannot_move_backward(self):
+        s = mk_state(Color.RED, blocker_pos=(2, 4))
+        s.board.set((4, 4), Piece(Color.RED, PieceType.SOLDIER))
+        ms = legal_moves(s)
+        t = moves_as_tuples(ms)
+        self.assertNotIn(((4, 4), (5, 4)), t)
 
 
 if __name__ == "__main__":

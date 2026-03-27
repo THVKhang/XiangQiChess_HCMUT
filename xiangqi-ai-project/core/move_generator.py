@@ -50,7 +50,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
         return
     r, c = src
 
-    if p.kind is PieceType.ROOK:
+    if p.kind == PieceType.ROOK:
         for dr, dc in ORTHO_DIRS:
             for sq in ray_squares(src, dr, dc):
                 tp = state.board.get(sq)
@@ -61,7 +61,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
                     yield Move(src, sq, tp)
                 break
 
-    elif p.kind is PieceType.CANNON:
+    elif p.kind == PieceType.CANNON:
         # Move like rook when not capturing.
         # Capture: must have exactly one screen piece between src and dst on same rank/file.
         for dr, dc in ORTHO_DIRS:
@@ -81,7 +81,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
                     yield Move(src, sq, tp)
                 break
 
-    elif p.kind is PieceType.HORSE:
+    elif p.kind == PieceType.HORSE:
         # Knight with leg block.
         # (dr, dc, leg_pos)
         candidates: list[tuple[int, int, Pos]] = [
@@ -100,7 +100,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
             dst = (r + dr, c + dc)
             yield from _yield_if_ok(state, src, dst)
 
-    elif p.kind is PieceType.ELEPHANT:
+    elif p.kind == PieceType.ELEPHANT:
         # 2 diagonal, cannot cross river, eye block.
         candidates: list[tuple[int, int, Pos]] = [
             (-2, -2, (r - 1, c - 1)),
@@ -118,7 +118,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
                 continue
             yield from _yield_if_ok(state, src, dst)
 
-    elif p.kind is PieceType.ADVISOR:
+    elif p.kind == PieceType.ADVISOR:
         # 1 diagonal, within palace.
         for dr, dc in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             dst = (r + dr, c + dc)
@@ -126,7 +126,7 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
                 continue
             yield from _yield_if_ok(state, src, dst)
 
-    elif p.kind is PieceType.GENERAL:
+    elif p.kind == PieceType.GENERAL:
         # 1 orthogonal within palace; plus "flying general" capture on same file if clear.
         for dr, dc in ORTHO_DIRS:
             dst = (r + dr, c + dc)
@@ -140,11 +140,11 @@ def pseudo_legal_moves_for_piece(state: GameState, src: Pos) -> Iterator[Move]:
                 tp = state.board.get(sq)
                 if tp is None:
                     continue
-                if tp.kind is PieceType.GENERAL and enemy_color(p, tp):
+                if tp.kind == PieceType.GENERAL and enemy_color(p, tp):
                     yield Move(src, sq, tp)
                 break
 
-    elif p.kind is PieceType.SOLDIER:
+    elif p.kind == PieceType.SOLDIER:
         f = soldier_forward_delta(p.color)
         # forward
         yield from _yield_if_ok(state, src, (r + f, c))
@@ -162,7 +162,7 @@ def pseudo_legal_moves(state: GameState, color: Optional[Color] = None) -> List[
         color = state.side_to_move
     out: list[Move] = []
     for (pos, p) in state.board.squares():
-        if p is None or p.color is not color:
+        if p is None or p.color != color:
             continue
         out.extend(list(pseudo_legal_moves_for_piece(state, pos)))
     return out
@@ -269,12 +269,12 @@ def is_legal_move(state: GameState, move: Move) -> bool:
     sp = state.board.get(move.src)
     if sp is None:
         return False
-    if sp.color is not state.side_to_move:
+    if sp.color != state.side_to_move:
         return False
     if not in_bounds(move.src) or not in_bounds(move.dst):
         return False
     tp = state.board.get(move.dst)
-    if tp is not None and tp.color is sp.color:
+    if tp is not None and tp.color == sp.color:
         return False
 
     # So khớp theo (src, dst). capture trong Move chỉ là metadata; không bắt buộc khớp.

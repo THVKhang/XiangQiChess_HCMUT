@@ -40,8 +40,8 @@ class TestGameLoop(unittest.TestCase):
 
     def test_random_vs_random_runs_without_crashing(self):
         result = run_game(
-            RandomAgent(rng=random.Random(1)),
-            RandomAgent(rng=random.Random(2)),
+            RandomAgent(Color.RED, rng=random.Random(1)),
+            RandomAgent(Color.BLACK, rng=random.Random(2)),
             max_turns=6,
         )
 

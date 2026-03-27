@@ -30,6 +30,10 @@ class GameState:
             move_history=self.move_history.copy() 
         )
 
+    def copy(self) -> "GameState":
+        """Alias cho clone() để tương thích API cũ/tests."""
+        return self.clone()
+
     def apply_move(self, move: Move) -> Undo:
         """Fix state bug: Kiểm tra quân cờ và lượt đi"""
         moved = self.board.get(move.src)

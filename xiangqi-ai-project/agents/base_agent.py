@@ -2,6 +2,7 @@
 from typing import Optional
 from core.state import GameState
 from core.move import Move
+from core.rules import Color
 
 class BaseAgent:
     """
