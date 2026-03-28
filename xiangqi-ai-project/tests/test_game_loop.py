@@ -13,6 +13,7 @@ from game.game_loop import run_game
 
 @dataclass(slots=True)
 class ScriptedAgent:
+    player_id: Color
     moves: List[Optional[Move]]
     name: str = "ScriptedAgent"
     seen_sides: List[Color] = field(default_factory=list)
@@ -27,8 +28,8 @@ class TestGameLoop(unittest.TestCase):
         state = GameState()
         red_move = Move((6, 0), (5, 0))
         black_move = Move((3, 0), (4, 0))
-        red_agent = ScriptedAgent([red_move, None], name="RedScript")
-        black_agent = ScriptedAgent([black_move], name="BlackScript")
+        red_agent = ScriptedAgent(player_id=Color.RED, moves=[red_move, None], name="RedScript")
+        black_agent = ScriptedAgent(player_id=Color.BLACK, moves=[black_move], name="BlackScript")
 
         result = run_game(red_agent, black_agent, state=state, max_turns=3)
 
@@ -40,8 +41,8 @@ class TestGameLoop(unittest.TestCase):
 
     def test_random_vs_random_runs_without_crashing(self):
         result = run_game(
-            RandomAgent(Color.RED, rng=random.Random(1)),
-            RandomAgent(Color.BLACK, rng=random.Random(2)),
+            RandomAgent(player_id=Color.RED, rng=random.Random(1)),
+            RandomAgent(player_id=Color.BLACK, rng=random.Random(2)),
             max_turns=6,
         )
 
@@ -50,8 +51,8 @@ class TestGameLoop(unittest.TestCase):
         self.assertIn(result.final_state.side_to_move, {Color.RED, Color.BLACK})
 
     def test_illegal_move_raises(self):
-        red_agent = ScriptedAgent([Move((9, 0), (9, 1))])
-        black_agent = ScriptedAgent([None])
+        red_agent = ScriptedAgent(player_id=Color.RED, moves=[Move((9, 4), (9, 6))])
+        black_agent = ScriptedAgent(player_id=Color.BLACK, moves=[None])
 
         with self.assertRaises(ValueError):
             run_game(red_agent, black_agent, max_turns=1)
@@ -59,11 +60,20 @@ class TestGameLoop(unittest.TestCase):
     def test_game_loop_applies_moves_to_state(self):
         state = GameState()
         red_move = legal_moves(state)[0]
-        black_state = state.copy()
+        black_state = state.clone()
         black_state.apply_move(red_move)
         black_move = legal_moves(black_state)[0]
 
-        result = run_game(ScriptedAgent([red_move]), ScriptedAgent([black_move]), state=state, max_turns=2)
+        result = run_game(
+            ScriptedAgent(player_id=Color.RED, moves=[red_move]),
+            ScriptedAgent(player_id=Color.BLACK, moves=[black_move]),
+            state=state,
+            max_turns=2,
+        )
 
         self.assertEqual(len(result.final_state.move_history), 2)
         self.assertEqual(result.reason, "max_turns_reached")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Protocol
 
-from agents.base_agent import BaseAgent
 from core.move import Move
 from core.move_generator import assert_legal_move, get_winner, is_terminal, result_if_terminal
 from core.rules import Color
 from core.state import GameState
+
+
+class AgentLike(Protocol):
+    name: str
+    player_id: Color
+
+    def select_move(self, state: GameState) -> Optional[Move]:
+        ...
 
 
 @dataclass(slots=True)
@@ -31,8 +38,8 @@ class GameLoop:
 
     def __init__(
         self,
-        red_agent: BaseAgent,
-        black_agent: BaseAgent,
+        red_agent: AgentLike,
+        black_agent: AgentLike,
         state: Optional[GameState] = None,
         max_turns: int = 200,
     ) -> None:
@@ -41,7 +48,7 @@ class GameLoop:
         self.state = state.clone() if state is not None else GameState()
         self.max_turns = max_turns
 
-    def current_agent(self) -> BaseAgent:
+    def current_agent(self) -> AgentLike:
         return self.red_agent if self.state.side_to_move == Color.RED else self.black_agent
 
     def play(self) -> GameLoopResult:
@@ -56,6 +63,7 @@ class GameLoop:
                     reason=terminal.reason,
                     history=history,
                 )
+
             if is_terminal(self.state):
                 return GameLoopResult(
                     final_state=self.state,
@@ -67,14 +75,7 @@ class GameLoop:
             agent = self.current_agent()
             side = self.state.side_to_move
             move = agent.select_move(self.state.clone())
-            history.append(
-                TurnRecord(
-                    ply=ply,
-                    side=side,
-                    agent_name=agent.name,
-                    move=move,
-                )
-            )
+            history.append(TurnRecord(ply=ply, side=side, agent_name=agent.name, move=move))
 
             if move is None:
                 return GameLoopResult(
@@ -96,8 +97,8 @@ class GameLoop:
 
 
 def run_game(
-    red_agent: BaseAgent,
-    black_agent: BaseAgent,
+    red_agent: AgentLike,
+    black_agent: AgentLike,
     state: Optional[GameState] = None,
     max_turns: int = 200,
 ) -> GameLoopResult:
