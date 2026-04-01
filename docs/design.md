@@ -178,6 +178,46 @@ Because pseudo-legal moves include captures toward the general square, this capt
 
 - **`rules.py`** intentionally does **not** depend on `GameState` for heavy logic — it only provides **pure predicates** and **geometry**, which keeps import cycles manageable and tests simple.
 
+---
 
+# Demo Human mode
 
+This section clarifies the demo flow for the backend Human mode that is already supported by the current code.
+
+## Goal
+
+The purpose of the demo is to show that a human player can participate in the game loop by entering moves from the terminal, while the opponent is controlled by another agent such as a random agent or a search-based AI.
+
+## Files involved
+
+- `agents/human_player.py`: reads and validates terminal input.
+- `game/game_loop.py`: dispatches turns to the correct side, validates moves, and applies them to the game state.
+- `agents/random_agent.py` or `agents/search_agent.py`: provides the opponent for the demo.
+
+## Demo flow
+
+1. Initialize a `HumanPlayer` for one side, typically Red.
+2. Initialize an opponent agent for the other side.
+3. Start the backend game loop with `run_game(red_agent, black_agent, ...)`.
+4. When it is the human player’s turn, the terminal prompts for input in the format:
+   - `src_row src_col dst_row dst_col`
+5. If the input is malformed, the human agent prints an error and requests input again.
+6. If the parsed move is not in the legal move set, the human agent reports an illegal move and asks again.
+7. When a valid move is entered, the game loop applies it and switches to the opponent’s turn.
+8. The process continues until a terminal result or the configured turn limit is reached.
+
+## Example demo configuration
+
+A simple backend demo can use:
+
+- Red: `HumanPlayer`
+- Black: `RandomAgent`
+
+This is sufficient to demonstrate human interaction, legal-move validation, and stable turn switching even before the full UI integration is completed.
+
+## Scope note
+
+This Human mode demo currently describes the backend / terminal flow rather than a full Pygame click-based interface. That is intentional: the backend path is already implemented and testable, while richer UI interaction can be integrated later without changing the core agent/game-loop contract.
+
+---
 

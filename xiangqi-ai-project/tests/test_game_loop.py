@@ -3,12 +3,13 @@ import unittest
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from agents.human_player import HumanPlayer
 from agents.random_agent import RandomAgent
 from core.move import Move
 from core.move_generator import legal_moves
 from core.rules import Color
 from core.state import GameState
-from game.game_loop import run_game
+from game.game_loop import GameLoop, run_game
 
 
 @dataclass(slots=True)
@@ -51,7 +52,7 @@ class TestGameLoop(unittest.TestCase):
         self.assertIn(result.final_state.side_to_move, {Color.RED, Color.BLACK})
 
     def test_illegal_move_raises(self):
-        red_agent = ScriptedAgent(player_id=Color.RED, moves=[Move((9, 4), (9, 6))])
+        red_agent = ScriptedAgent(player_id=Color.RED, moves=[Move((9, 4), (8, 6))])
         black_agent = ScriptedAgent(player_id=Color.BLACK, moves=[None])
 
         with self.assertRaises(ValueError):
@@ -73,6 +74,73 @@ class TestGameLoop(unittest.TestCase):
 
         self.assertEqual(len(result.final_state.move_history), 2)
         self.assertEqual(result.reason, "max_turns_reached")
+
+    def test_human_player_retries_until_legal_move(self):
+        prompts: list[str] = []
+        outputs: list[str] = []
+        scripted_inputs = iter([
+            "bad input",
+            "9 4 8 6",
+            "6 0 5 0",
+        ])
+
+        human = HumanPlayer(
+            player_id=Color.RED,
+            input_func=lambda prompt: prompts.append(prompt) or next(scripted_inputs),
+            output_func=outputs.append,
+        )
+
+        move = human.select_move(GameState())
+
+        self.assertEqual(move, Move((6, 0), (5, 0)))
+        self.assertEqual(len(prompts), 3)
+        self.assertTrue(any("exactly 4 integers" in message for message in outputs))
+        self.assertTrue(any("Illegal move" in message for message in outputs))
+
+    def test_human_vs_ai_mode_runs(self):
+        scripted_inputs = iter(["6 0 5 0"])
+        human = HumanPlayer(
+            player_id=Color.RED,
+            input_func=lambda _prompt: next(scripted_inputs),
+            output_func=lambda _message: None,
+        )
+        ai = ScriptedAgent(player_id=Color.BLACK, moves=[Move((3, 0), (4, 0))], name="EasyAI")
+
+        result = run_game(human, ai, max_turns=2)
+
+        self.assertEqual(result.reason, "max_turns_reached")
+        self.assertEqual(len(result.history), 2)
+        self.assertEqual(result.history[0].agent_name, "HumanPlayer")
+        self.assertEqual(result.history[1].agent_name, "EasyAI")
+
+    def test_ai_vs_random_mode_runs(self):
+        ai = ScriptedAgent(player_id=Color.RED, moves=[Move((6, 0), (5, 0))], name="EasyAI")
+        random_agent = RandomAgent(player_id=Color.BLACK, rng=random.Random(7))
+
+        result = run_game(ai, random_agent, max_turns=2)
+
+        self.assertEqual(result.reason, "max_turns_reached")
+        self.assertEqual(result.history[0].agent_name, "EasyAI")
+        self.assertEqual(result.history[1].agent_name, "RandomAgent")
+
+    def test_ai_vs_ai_mode_runs(self):
+        red_ai = ScriptedAgent(player_id=Color.RED, moves=[Move((6, 0), (5, 0))], name="EasyAI")
+        black_ai = ScriptedAgent(player_id=Color.BLACK, moves=[Move((3, 0), (4, 0))], name="MediumAI")
+
+        result = run_game(red_ai, black_ai, max_turns=2)
+
+        self.assertEqual(result.reason, "max_turns_reached")
+        self.assertEqual([record.agent_name for record in result.history], ["EasyAI", "MediumAI"])
+
+    def test_game_loop_current_agent_matches_side_to_move(self):
+        loop = GameLoop(
+            red_agent=ScriptedAgent(player_id=Color.RED, moves=[]),
+            black_agent=ScriptedAgent(player_id=Color.BLACK, moves=[]),
+        )
+        self.assertEqual(loop.current_agent().player_id, Color.RED)
+
+        loop.state.side_to_move = Color.BLACK
+        self.assertEqual(loop.current_agent().player_id, Color.BLACK)
 
 
 if __name__ == "__main__":
