@@ -108,8 +108,85 @@ Tests cover:
 ---
 
 ## 3. Search / AI *(outline)*
+### 3.1 Searching Algorithms
 
 *(Minimax, alpha-beta, heuristics, transposition table — to be completed.)*
+
+### 3.2 Modes and Agents
+
+This subsection summarizes how the gameplay modes are organized and how each agent interacts with the game loop.
+
+### 3.2.1 Common Agent Interface
+
+All playable entities are treated as agents that expose a common method:
+
+- `select_move(state) -> Optional[Move]`
+
+The method receives the current `GameState` (cloned by the game loop before dispatch) and returns either:
+
+- a legal `Move`, or
+- `None` if the agent cannot provide a move.
+
+This lightweight interface allows the same backend loop to run human-controlled play, random baseline play, and search-based AI play.
+
+### 3.2.2 RandomAgent
+
+`agents/random_agent.py` implements the baseline random rule-based agent required by the assignment. Its behavior is:
+
+1. obtain all legal moves from the current state,
+2. return `None` if no legal move exists,
+3. otherwise choose one move uniformly at random.
+
+Because the move is sampled only from `legal_moves(state)`, this agent is random but still rule-compliant. It is therefore suitable as the baseline opponent for later evaluation.
+
+### 3.2.3 HumanPlayer
+
+`agents/human_player.py` implements a terminal-based human agent. The player enters a move in the form:
+
+`src_row src_col dst_row dst_col`
+
+The agent then:
+
+1. parses the input string,
+2. converts it into a `Move` object,
+3. compares the move against the current legal move set,
+4. asks for another input if the format is invalid or the move is illegal.
+
+This design keeps input validation inside the human agent while leaving turn management to the central game loop.
+
+### 3.2.4 Game Modes
+
+With a unified agent interface, the backend can support multiple gameplay modes by simply plugging different agents into the red and black sides:
+
+- **Human vs AI**: one `HumanPlayer` and one search agent,
+- **AI vs Random**: one search agent and one `RandomAgent`,
+- **AI vs AI**: two search agents with possibly different levels.
+
+The current backend is intentionally mode-agnostic: a mode is defined by the pair of agents passed to the loop, not by separate duplicated logic.
+
+### 3.2.5 Game Loop Integration
+
+`game/game_loop.py` is the coordinator for all modes. For each turn, it:
+
+1. checks terminal conditions,
+2. selects the current agent based on `state.side_to_move`,
+3. requests a move from that agent,
+4. validates the returned move with `assert_legal_move`,
+5. applies the move and records the turn in history.
+
+This keeps move generation, validation, and turn switching centralized in one backend path, which reduces mode-specific bugs and makes testing easier.
+
+### 3.2.6 Testing Strategy for Modes
+
+`tests/test_game_loop.py` focuses on behavior at the integration level:
+
+- the correct agent is called on the correct turn,
+- random vs random can run stably for multiple plies,
+- invalid moves are rejected,
+- human input can be retried until a valid legal move is entered,
+- backend configurations corresponding to Human vs AI, AI vs Random, and AI vs AI all execute without crashing.
+
+These tests do not attempt to measure playing strength. Instead, they verify that the backend mode wiring is correct before stronger search agents are integrated.
 
 ---
 
@@ -129,3 +206,4 @@ Tests cover:
 
 - Xiangqi rules (e.g. Wikipedia, official federation rules) for human-readable rule description.
 - Project source: `xiangqi-ai-project/core/rules.py`, `xiangqi-ai-project/core/move_generator.py`.
+
