@@ -1,56 +1,29 @@
-# Artificial Intelligence Engine: Algorithmic Architecture and Difficulty Scaling
+# Report Outline: Algorithmic Engine and Difficulty Stratification
 
-## 1. Algorithmic Foundation
+## 1. Algorithmic Framework and Search Mechanisms
 
-The decision-making core of the Xiangqi Artificial Intelligence relies on game-tree search algorithms. To accommodate a scalable computational framework, the system implements a duality of search paradigms:
+### 1.1. Minimax Algorithm with Alpha-Beta Pruning
+The core decision-making engine of the autonomous agent is predicated upon the **Minimax algorithm**, a deterministic adversarial search paradigm. To address the combinatorial explosion inherent in the game tree of Xiangqi, **Alpha-Beta pruning** is intrinsically applied. This optimization mathematically guarantees the elimination of sub-optimal game tree branches, thereby drastically accelerating the search process without compromising the integrity of the terminal decision. The dynamically pruned search tree facilitates deeper computational foresight within identical temporal constraints.
 
-### 1.1. Minimax Algorithm
-As a baseline for zero-sum game theory, the classical Minimax algorithm simulates the game tree by assuming optimal play from both sides. It recursively evaluates subsequent game states, maximizing the current player's utility while minimizing the opponent's. Although theoretically sound, the pure Minimax implementation suffers from exponential time complexity $O(b^d)$ (where $b$ is the branching factor and $d$ is the search depth), making it computationally prohibitive for deeper evaluations in a complex domain like Xiangqi.
+### 1.2. State Space Complexity Reduction
+Given the vast state space complexity of Xiangqi (average branching factor $b \approx 38$), advanced state-caching methodologies have been implemented to optimize temporal performance:
+*   **Zobrist Hashing and Transposition Tables**: A mathematically robust stochastic hashing mechanism (Zobrist Hashing) is utilized to generate near-unique 64-bit cryptographic representations of arbitrary board configurations. These hash identifiers index a Transposition Table, which caches previously calculated state evaluations, traversed search depths, and alpha-beta bounds. When identical topological board states are reached via heterogeneous move permutations (transpositions), the agent retrieves the cached metadata, thereby comprehensively circumventing redundant deterministic sub-tree expansions.
+*   **Heuristic Evaluation Caching**: The static terminal-node evaluation function is a computationally intensive procedure. By implementing an auxiliary caching paradigm specifically dedicated to heuristic state-evaluations, the system significantly amortizes the computational overhead, directly reducing the inference latency during deep-tree traversals.
 
-### 1.2. Alpha-Beta Pruning
-To mitigate the exponential explosion of the game tree, the Alpha-Beta pruning algorithm is strategically employed as the primary search engine. By maintaining two bounding variables—$\alpha$ (the minimum score the maximizing player is assured of) and $\beta$ (the maximum score the minimizing player is assured of)—the algorithm mathematically eliminates subordinate branches that cannot possibly influence the final decision. In the theoretical optimum, Alpha-Beta pruning reduces the time complexity to $O(b^{d/2})$, exponentially expanding the feasible search depth within identical temporal constraints.
+### 1.3. Static Evaluation Heuristics
+The heuristic evaluation function serves as the quantitative oracle for non-terminal leaf nodes, computing a linear combination of localized tactical and strategic features. The foundational framework heavily weights the **Material Advantage Heuristic**, strategically allocating normalized numerical coefficients to distinct piece classes (e.g., Chariots, Cannons, Horses) to mathematically approximate the overarching positional and material advantage.
 
-## 2. Advanced Search Optimizations
+---
 
-To further enhance the efficiency of the Alpha-Beta search and achieve lower latency in real-time execution, several sophisticated optimization techniques have been integrated.
+## 2. Difficulty Stratification and Performance Scaling
 
-### 2.1. Heuristic Move Ordering (MVV-LVA)
-The efficacy of Alpha-Beta pruning is heavily dependent on the order in which nodes are evaluated. If potentially optimal moves are evaluated earlier, larger sections of the tree can be instantaneously pruned. The engine incorporates a heuristic **Move Ordering** mechanism utilizing the **Most Valuable Victim - Least Valuable Attacker (MVV-LVA)** principle. By prioritizing captures where a high-value piece is attacked by a low-value piece, the engine aggressively forces early cutoffs in the search tree.
+The cognitive complexity and tactical proficiency of the agent are dynamically regulated through a multi-tiered difficulty architecture, implicitly governed by constraints on algorithmic search depth and heuristic utilization:
 
-### 2.2. Transposition Tables
-In Xiangqi, highly disparate sequences of moves can frequently converge into identical board configurations (transpositions). To prevent redundant computational overhead, the engine integrates a **Transposition Table** architecture. Each unique board state is mathematically serialized into an immutable hash equivalent (in Python, utilizing highly optimized `frozenset` operations mapping piece coordinates, types, and affiliations). When encountering a previously evaluated state, the engine retrospectively retrieves the exact score or the relevant $\alpha/\beta$ bounds, effectively truncating redundant subtree explorations.
+### 2.1. Level 1: Novice (Depth 1 - 2)
+Characterized by a severely truncated search horizon. The agent processes predominantly immediate tactical exchanges (e.g., capturing unilaterally exposed pieces) and lacks substantive strategic foresight. This configuration evaluates purely on shallow state transitions, generating an accessible, highly reactive opponent suitable for inexperienced human players.
 
-### 2.3. Heuristic Evaluation Caching
-Symmetric to transposition tables, **Evaluation Caching** creates a memorization dictionary specifically for terminal node static evaluations. Due to the high frequency of identical terminal states appearing across different search branches, caching the computationally expensive positional heuristics drastically reduces redundant iterations over the board state.
+### 2.2. Level 2: Intermediate (Depth 3 - 4)
+The search horizon is expanded to permit fundamental combinatorial tactics and intermediate positional planning. While Alpha-Beta pruning is continuously active, the bounded traversal depth constrains the agent's capacity to foresee complex, multi-stage forcing sequences. The agent simulates moderate intellectual gameplay, balancing reasonable algorithmic execution time with adequate tactical defense and recognizable strategic patterns.
 
-## 3. Static Evaluation Heuristics
-
-The leaf nodes of the search tree are quantified utilizing static evaluation functions. The agent transitions between two heuristic modalities dynamically based on its configured cognitive capacity.
-
-### 3.1. Material-Centric Evaluation (Basic)
-The fundamental heuristic linearly aggregates the intrinsic material value of each active piece. The deterministic piece values are empirically derived: General (10,000), Rook (900), Cannon (450), Knight (400), Elephant/Advisor (200), and Pawn (100). This provides a foundational quantitative metric for material superiority.
-
-### 3.2. Positional and Strategic Evaluation (Advanced)
-A more sophisticated heuristic function augments the basic material count with spatial and tactical significance:
-* **Pawn Advancement:** Rewards exponential value to Pawns successfully crossing the river, particularly those approaching the opponent's inner palace (Nine-Palace).
-* **Piece Mobility & Deployment:** Penalizes Edge Knights (due to restricted mobility) whilst rewarding Central Knights. Rooks are incentivized to control centralized and critical files.
-* **Palace Defense Coordination:** Evaluates the structural integrity of the defensive posture. Generals departing the central file, or dismantled Advisor/Elephant formations, incur significant detrimental scores.
-
-## 4. Difficulty Stratification Matrix (Levels 1 - 10)
-
-The cognitive prowess of the AI is strictly modulated across ten distinct difficulty tiers. This is achieved through a multi-dimensional configuration encompassing search depth, heuristic complexity, and optimization constraints.
-
-| Level | Classification | Search Depth | Heuristic Topology | Move Ordering (MVV-LVA) |
-| :---: | :--- | :---: | :--- | :---: |
-| **1** | Beginner | $d = 1$ | Basic (Material) | Disabled |
-| **2** | Novice | $d = 1$ | Advanced (Positional) | Disabled |
-| **3** | Intermediate | $d = 2$ | Basic (Material) | Disabled |
-| **4** | Competent | $d = 2$ | Advanced (Positional) | Disabled |
-| **5** | Advanced | $d = 2$ | Advanced (Positional) | Enabled |
-| **6** | Expert | $d = 3$ | Basic (Material) | Disabled |
-| **7** | Master | $d = 3$ | Advanced (Positional) | Disabled |
-| **8** | Grandmaster | $d = 3$ | Advanced (Positional) | Enabled |
-| **9** | Elite | $d = 4$ | Advanced (Positional) | Disabled |
-| **10**| State-of-the-Art| $d = 4$ | Advanced (Positional) | Enabled |
-
-Through this rigorously parameterized matrix, the artificial intelligence ensures a pedagogically progressive adversary, ranging from instantaneous, purely reactive play (Level 1) to highly strategic, deeply calculative configurations (Level 10).
+### 2.3. Level 3: Advanced / Expert (Depth 5+)
+This tier represents the theoretical apex of the underlying algorithmic architecture. The search depth is maximized, comprehensively leveraging the Transposition Table and Zobrist Hashing to dynamically traverse extensive branches of the game tree. The agent consistently evaluates profound positional sacrifices, executes deep forcing sequences, and exhibits optimal strategic continuity. Computational resources are fully deployed to maximize the formulation of the objective function against complex adversarial strategies.
