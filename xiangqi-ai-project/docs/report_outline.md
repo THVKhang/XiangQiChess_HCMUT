@@ -24,9 +24,31 @@ This subsection explains how Xiangqi (Chinese chess) rules are represented and e
 
 This convention matches the standard initial setup: Black general at `(0, 4)`, Red general at `(9, 4)`.
 
-### 2.2 Core Data Types (`core/rules.py`)
+### 2.2 Game State and Board Management (`core/state.py`, `core/board.py`)
 
-- **`Color`**: `RED` / `BLACK`. The property `other` returns the opponent color. Enum members are compared with **`==`**  so that deserialized or reconstructed values still behave correctly.
+This subsection details the architectural design of the game’s "backbone," responsible for maintaining the board's integrity, handling move transitions, and providing efficient snapshots for the AI search engine.
+
+#### 2.2.1 The Board Model (`core/board.py`)
+The `Board` class encapsulates the physical grid and provides low-level manipulation methods:
+* **Grid Storage**: Implemented as a 2D list `List[List[Optional[Piece]]]` to store piece objects or `None`.
+* **Encapsulated Mutation**: Methods like `get(pos)`, `set(pos, piece)`, and `move_piece(src, dst)` centralize board changes.
+* **Efficient Copying**: The `copy()` method performs a shallow copy of the grid rows, providing a fast way to duplicate states.
+
+#### 2.2.2 The GameState Container (`core/state.py`)
+The `GameState` class acts as the primary coordinator for the engine's status:
+* **Status Tracking**: Maintains the current `Board`, `side_to_move`, and `move_history`.
+* **Move Execution (`apply_move`)**: Updates the state by moving pieces and switching the active player, with strict validation for turn order.
+* **State Reversion (`undo_move`)**: Restores the board and player turn using an `Undo` dataclass to support Alpha-Beta backtracking efficiently.
+
+#### 2.2.3 Performance Optimizations for AI
+Several optimizations were implemented to support the high-frequency requirements of the `SearchAgent`:
+* **Lazy Importing**: Resolves **circular dependencies** between `state.py` and `move_generator.py` using local imports within methods.
+* **Optimized Cloning**: The `clone()` method duplicates the board and history efficiently for independent search simulations.
+* **Memory Efficiency**: Use of `__slots__` in `Undo` and `GameState` to reduce memory footprint.
+
+### 2.3 Core Data Types (`core/rules.py`)
+
+- **`Color`**: `RED` / `BLACK`. The property `other` returns the opponent color. Enum members are compared with **`==`** so that deserialized or reconstructed values still behave correctly.
 - **`PieceType`**: `GENERAL`, `ADVISOR`, `ELEPHANT`, `HORSE`, `ROOK`, `CANNON`, `SOLDIER`.
 - **`Piece`**: immutable `color` + `kind`.
 
@@ -42,7 +64,7 @@ Helper predicates used by move generation:
 
 **`initial_setup_piece_at(pos)`** returns the standard piece at each square, or `None` — used by `Board.initial()`.
 
-### 2.3 Two-Stage Move Generation (`core/move_generator.py`)
+### 2.4 Two-Stage Move Generation (`core/move_generator.py`)
 
 The engine separates **geometric / piece rules** from **global Xiangqi constraints**.
 
@@ -69,7 +91,7 @@ The engine separates **geometric / piece rules** from **global Xiangqi constrain
 
 **Note:** “Check” from **facing generals** is included because enemy pseudo-moves include the **flying general** capture along the file when the path is clear; thus both generals can be considered “in check” in that configuration, which matches the rule that such a position is forbidden for the side to move.
 
-### 2.4 Piece-Specific Movement Rules (Implementation Summary)
+### 2.5 Piece-Specific Movement Rules (Implementation Summary)
 
 All piece branches use **`enemy_color`** for captures and **`_yield_if_ok`** for empty squares or enemy captures (never friendly capture).
 
@@ -79,9 +101,9 @@ All piece branches use **`enemy_color`** for captures and **`_yield_if_ok`** for
 - **Elephant**: Two diagonal steps; **elephant’s eye** (intermediate diagonal cell) must be empty; destination must remain on **own side of the river** (`on_own_side_of_river`).
 - **Advisor**: One diagonal step; destination must lie inside **own palace**.
 - **General**: One orthogonal step inside own palace; plus **flying general**: along the **vertical** file, if the first piece encountered is the **enemy general**, that capture is generated (only when the entire segment between the two generals has no other pieces — ensured by scanning ray until first blocker).
-- **Soldier**: One step forward (`soldier_forward_delta`); after **crossing the river** (i.e. when not on own side), may also move one step **left or right** (not backward).
+- **Soldier**: One step forward (`soldier_forward_delta`); after **crossing the river** (i.e. when not on own side), may also move one step **left or right** (not weapon backward).
 
-### 2.5 Terminal State, Winner, and Move Validation
+### 2.6 Terminal State, Winner, and Move Validation
 
 - **`result_if_terminal(state)`**: If there are **no legal moves** for the side to move:
   - If that side is **in check** → **checkmate** (winner = opponent).
@@ -90,20 +112,22 @@ All piece branches use **`enemy_color`** for captures and **`_yield_if_ok`** for
 - **`get_winner(state)`**: Derives winner from missing general or from `result_if_terminal`.
 - **`is_legal_move` / `assert_legal_move`**: Validate a proposed `Move` against **`legal_moves`** (by `src`/`dst`), for UI or engine input.
 
-### 2.6 Implementation Notes and Pitfalls
+### 2.7 Implementation Notes and Pitfalls
 
 - **Enum comparison**: `PieceType` / `Color` comparisons use **`==`** in move logic to avoid subtle bugs when values are reconstructed from external data.
 - **`GameState.copy()`** aliases **`clone()`** for compatibility with older code/tests.
 - **Separation of concerns**: `core/rules.py` holds **board geometry and shared predicates**; `core/move_generator.py` holds **move generation, legality filtering, and game outcome helpers**.
+- **Circular Imports**: Managed by performing local imports within `GameState` methods to break the dependency cycle with `move_generator.py`.
 
-### 2.7 Testing Strategy (`tests/test_rules.py`)
+### 2.8 Testing Strategy (`tests/test_rules.py`, `tests/test_state.py`)
 
 Tests cover:
 
 - Per-piece behaviour (rook block, horse leg, elephant river/eye, cannon screen, soldier directions, palace bounds).
 - **Legal move filtering** (e.g. pinned rook, flying general capture when file is clear).
 - **Check** scenarios (rook, cannon, horse, soldier, facing generals).
-- **Long-run random play** with `legal_moves` + `apply_move` / `undo` to stress invariant “no illegal post-move state.”
+- **Apply/Undo Invariance**: Ensures board returns to initial state after sequence of actions.
+- **Long-run random play**: Stress tests invariants during extended sessions.
 
 ---
 
@@ -117,20 +141,20 @@ The foundational algorithmic framework is anchored upon the **Minimax algorithm*
 
 #### 3.1.2 Advanced Search Optimizations
 To further amplify the temporal efficiency of the Alpha-Beta exploration, several auxiliary optimizations are implemented:
-*   **Heuristic Move Ordering (MVV-LVA)**: Employs the Most Valuable Victim - Least Valuable Attacker (MVV-LVA) sorting mechanism. By intuitively evaluating highly potent captures chronologically earlier in the search iteration, the model reliably incites early Alpha-Beta cut-offs.
-*   **Transposition Table and Zobrist Hashing**: To cleanly circumvent the computational redundancy of traversing identical board topologies reached through diverse transpositions (move permutations), the agent leverages continuous stochastic Zobrist Hashing. This reliably caches meticulously derived $\alpha/\beta$ bounds, traversed depth metrics, and specific terminal scores within an asynchronous dictionary framework.
-*   **Evaluation Caching**: Identical terminal node arrays are autonomously cached to mathematically bypass the repetitive infrastructural overhead of recalculating complex static positional evaluations.
+* **Heuristic Move Ordering (MVV-LVA)**: Employs the Most Valuable Victim - Least Valuable Attacker (MVV-LVA) sorting mechanism. By intuitively evaluating highly potent captures chronologically earlier in the search iteration, the model reliably incites early Alpha-Beta cut-offs.
+* **Transposition Table and Zobrist Hashing**: To cleanly circumvent the computational redundancy of traversing identical board topologies reached through diverse transpositions (move permutations), the agent leverages continuous stochastic Zobrist Hashing. This reliably caches meticulously derived $\alpha/\beta$ bounds, traversed depth metrics, and specific terminal scores within an asynchronous dictionary framework.
+* **Evaluation Caching**: Identical terminal node arrays are autonomously cached to mathematically bypass the repetitive infrastructural overhead of recalculating complex static positional evaluations.
 
 #### 3.1.3 Static Evaluation Heuristics
 The non-terminal leaf nodes of the bounded search tree are uniformly quantified utilizing deterministic static heuristics.
-*   **Material Matrix (Basic)**: A linear aggregation derived from globally empirical piece values: General (10,000), Rook (900), Cannon (450), Horse (400), Elephant/Advisor (200), Soldier (100).
-*   **Positional Strategy (Advanced)**: Dynamic mathematical multipliers are functionally integrated into the baseline material score to prioritize tactical variables: pawn river crossings, central file rook control, knight mobility constrictions, and explicit palace architectural defense arrays.
+* **Material Matrix (Basic)**: A linear aggregation derived from globally empirical piece values: General (10,000), Rook (900), Cannon (450), Horse (400), Elephant/Advisor (200), Soldier (100).
+* **Positional Strategy (Advanced)**: Dynamic mathematical multipliers are functionally integrated into the baseline material score to prioritize tactical variables: pawn river crossings, central file rook control, knight mobility constrictions, and explicit palace architectural defense arrays.
 
 #### 3.1.4 Difficulty Stratification (Levels)
 The cognitive proficiency of the agent is dynamically regulated through the rigorous parameterization of adversarial traversal depths and heuristic utilization constraints:
-*   **Level 1 (Novice)**: Radically restricts the traversal depth horizon to precisely $(d=1)$. Evaluates exclusively under the Basic Material Matrix, inherently facilitating accessible, highly reactive play without structured strategic foresight.
-*   **Level 2 (Intermediate)**: Traversal depth is marginally expanded $(d=2 \to d=3)$ alongside activation of the Advanced Positional Heuristics. The agent formulates fundamental forcing sequences whilst balancing mathematical execution time.
-*   **Level 3 (Advanced/Expert)**: The theoretical capacity apex of the implemented search architecture. Temporal depth is strictly maximized ($d \ge 4$). Synthesizes the complete Transposition Table, strict Move Ordering validations, and comprehensive positional strategies to manifest highly unyielding, deeply calculative adversarial intelligence.
+* **Level 1 (Novice)**: Radically restricts the traversal depth horizon to precisely $(d=1)$. Evaluates exclusively under the Basic Material Matrix, inherently facilitating accessible, highly reactive play without structured strategic foresight.
+* **Level 2 (Intermediate)**: Traversal depth is marginally expanded $(d=2 \to d=3)$ alongside activation of the Advanced Positional Heuristics. The agent formulates fundamental forcing sequences whilst balancing mathematical execution time.
+* **Level 3 (Advanced/Expert)**: The theoretical capacity apex of the implemented search architecture. Temporal depth is strictly maximized ($d \ge 4$). Synthesizes the complete Transposition Table, strict Move Ordering validations, and comprehensive positional strategies to manifest highly unyielding, deeply calculative adversarial intelligence.
 
 ### 3.2 Modes and Agents
 

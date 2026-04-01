@@ -37,6 +37,19 @@ class TestMove(unittest.TestCase):
         # Di chuyển quân Mã (chữ L): (9,1) -> (7,2) => dist^2 = 2^2 + 1^2 = 5
         move_horse = Move(src=(9, 1), dst=(7, 2))
         self.assertEqual(move_horse.distance_squared, 5)
+    def test_multiple_move_properties(self):
+        """Test liên tục: Kiểm tra tính đúng đắn của thuộc tính Move"""
+        # Test nước đi của Xe (thẳng)
+        rook_move = Move((9, 0), (7, 0))
+        self.assertEqual(rook_move.distance_squared, 4)
+        
+        # Sửa PAWN thành SOLDIER để khớp với rules.py của Bảo
+        cannon_cap = Move((7, 1), (2, 1), capture=Piece(Color.BLACK, PieceType.SOLDIER))
+        self.assertTrue(cannon_cap.is_capture())
+        
+        # Đảm bảo Move không bị thay đổi dữ liệu sau khi khởi tạo (Frozen)
+        with self.assertRaises(Exception):
+            rook_move.src = (0, 0)    
 
 if __name__ == '__main__':
     unittest.main()
