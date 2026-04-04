@@ -1,65 +1,47 @@
-from core.state import GameState
+import unittest
+
+from agents.search_agent import EasyAgent, HardAgent, LevelAgent, MediumAgent
+from core.move_generator import is_legal_move
 from core.rules import Color
-from agents.search_agent import EasyAgent, MediumAgent, HardAgent, LevelAgent
+from core.state import GameState
 
-def test_easy_agent(algo="alphabeta"):
-    state = GameState()
-    agent = EasyAgent(player_id=Color.RED, algorithm=algo)
-    move = agent.select_move(state)
-    assert move is not None
-    print(f"EasyAgent decided: {move}")
 
-def test_medium_agent(algo="alphabeta"):
-    state = GameState()
-    agent = MediumAgent(player_id=Color.RED, algorithm=algo)
-    move = agent.select_move(state)
-    assert move is not None
-    print(f"MediumAgent decided: {move}")
+class TestSearchAgents(unittest.TestCase):
+    def setUp(self):
+        self.state = GameState()
 
-def test_hard_agent(algo="alphabeta"):
-    state = GameState()
-    agent = HardAgent(player_id=Color.RED, algorithm=algo)
-    move = agent.select_move(state)
-    assert move is not None
-    print(f"HardAgent decided: {move}")
+    def test_easy_agent_returns_legal_move(self):
+        agent = EasyAgent(player_id=Color.RED, algorithm="alphabeta")
+        move = agent.select_move(self.state.clone())
+        self.assertIsNotNone(move)
+        self.assertTrue(is_legal_move(self.state, move))
 
-def test_agent_consistency(algo="alphabeta"):
-    state = GameState()
-    # Kiểm tra xem các agent có thực thị select_move hợp lệ từ state không
-    agent1 = EasyAgent(player_id=Color.RED, algorithm=algo)
-    agent2 = MediumAgent(player_id=Color.RED, algorithm=algo)
-    agent3 = HardAgent(player_id=Color.RED, algorithm=algo)
-    
-    assert agent1.select_move(state.clone()) is not None
-    assert agent2.select_move(state.clone()) is not None
-    assert agent3.select_move(state.clone()) is not None
+    def test_medium_agent_returns_legal_move(self):
+        agent = MediumAgent(player_id=Color.RED, algorithm="alphabeta")
+        move = agent.select_move(self.state.clone())
+        self.assertIsNotNone(move)
+        self.assertTrue(is_legal_move(self.state, move))
 
-def test_level_agent(n=1, algo="alphabeta"):
-    state = GameState()
-    print("\n[Testing LevelAgent Custom]")
-    
-    agent = LevelAgent(player_id=Color.RED, algorithm=algo, level=n)
-    move = agent.select_move(state.clone())
-    assert move is not None
-    print(f"LevelAgent (Level {n}) decided: {move}")
+    def test_hard_agent_returns_legal_move(self):
+        agent = HardAgent(player_id=Color.RED, algorithm="alphabeta")
+        move = agent.select_move(self.state.clone())
+        self.assertIsNotNone(move)
+        self.assertTrue(is_legal_move(self.state, move))
+
+    def test_minimax_mode_returns_legal_move(self):
+        agent = LevelAgent(player_id=Color.RED, algorithm="minimax", level=3)
+        move = agent.select_move(self.state.clone())
+        self.assertIsNotNone(move)
+        self.assertTrue(is_legal_move(self.state, move))
+
+    def test_level_range_returns_legal_move(self):
+        for lvl in [1, 4, 8, 10]:
+            with self.subTest(level=lvl):
+                agent = LevelAgent(player_id=Color.RED, algorithm="alphabeta", level=lvl)
+                move = agent.select_move(self.state.clone())
+                self.assertIsNotNone(move)
+                self.assertTrue(is_legal_move(self.state, move))
+
 
 if __name__ == "__main__":
-    algo = input("Enter algorithm (minimax/alphabeta): ")
-
-    print("--- Running test_easy_agent ---")
-    test_easy_agent(algo)
-    
-    print("\n--- Running test_medium_agent ---")
-    test_medium_agent(algo)
-    
-    print("\n--- Running test_hard_agent ---")
-    test_hard_agent(algo)
-    
-    print("\n--- Running test_agent_consistency ---")
-    test_agent_consistency()
-    
-    print("\n--- Running test_level_agent ---")
-    n = int(input("Enter level: "))
-    test_level_agent(n, algo)
-    
-    print("\nAll tests passed!")
+    unittest.main()

@@ -8,6 +8,8 @@ class Menu:
 
         self.selected_mode = "Human vs AI"
         self.selected_level = "Easy"
+        self.selected_red_level = "Easy"
+        self.selected_black_level = "Easy"
 
         self.modes = ["Human vs AI", "AI vs AI", "AI vs Random"]
         self.levels = ["Easy", "Medium", "Hard"]
@@ -19,6 +21,8 @@ class Menu:
 
         self.mode_buttons = []
         self.level_buttons = []
+        self.red_level_buttons = []
+        self.black_level_buttons = []
         self.start_button = None
         self.quit_button = None
 
@@ -39,6 +43,14 @@ class Menu:
             rect = pygame.Rect(center_x - 150, level_y + i * 60, 300, 44)
             self.level_buttons.append((level, rect))
 
+        # AI vs AI separate level buttons
+        ai_level_y = 420
+        for i, level in enumerate(self.levels):
+            red_rect = pygame.Rect(center_x - 170, ai_level_y + i * 60, 150, 44)
+            black_rect = pygame.Rect(center_x + 20, ai_level_y + i * 60, 150, 44)
+            self.red_level_buttons.append((level, red_rect))
+            self.black_level_buttons.append((level, black_rect))
+
         self.start_button = pygame.Rect(center_x - 150, 620, 140, 50)
         self.quit_button = pygame.Rect(center_x + 10, 620, 140, 50)
 
@@ -58,6 +70,20 @@ class Menu:
             elif event.key == pygame.K_h:
                 self.selected_level = "Hard"
 
+            elif event.key == pygame.K_q:
+                self.selected_red_level = "Easy"
+            elif event.key == pygame.K_w:
+                self.selected_red_level = "Medium"
+            elif event.key == pygame.K_e:
+                self.selected_red_level = "Hard"
+
+            elif event.key == pygame.K_a:
+                self.selected_black_level = "Easy"
+            elif event.key == pygame.K_s:
+                self.selected_black_level = "Medium"
+            elif event.key == pygame.K_d:
+                self.selected_black_level = "Hard"
+
             elif event.key == pygame.K_RETURN:
                 return "start"
             elif event.key == pygame.K_ESCAPE:
@@ -73,6 +99,14 @@ class Menu:
             for level, rect in self.level_buttons:
                 if rect.collidepoint(mouse_pos):
                     self.selected_level = level
+
+            for level, rect in self.red_level_buttons:
+                if rect.collidepoint(mouse_pos):
+                    self.selected_red_level = level
+
+            for level, rect in self.black_level_buttons:
+                if rect.collidepoint(mouse_pos):
+                    self.selected_black_level = level
 
             if self.start_button.collidepoint(mouse_pos):
                 return "start"
@@ -113,25 +147,51 @@ class Menu:
         for mode, rect in self.mode_buttons:
             self._draw_button(screen, rect, mode, selected=(mode == self.selected_mode))
 
-        level_heading = self.heading_font.render("Choose Level", True, (30, 30, 30))
-        screen.blit(level_heading, (self.width // 2 - 90, 380))
+        if self.selected_mode == "AI vs AI":
+            level_heading = self.heading_font.render("AI vs AI Levels", True, (30, 30, 30))
+            screen.blit(level_heading, (self.width // 2 - 105, 380))
 
-        for level, rect in self.level_buttons:
-            self._draw_button(screen, rect, level, selected=(level == self.selected_level))
+            red_label = self.small_font.render("Red AI", True, (80, 50, 30))
+            black_label = self.small_font.render("Black AI", True, (80, 50, 30))
+            screen.blit(red_label, (self.width // 2 - 125, 405))
+            screen.blit(black_label, (self.width // 2 + 65, 405))
+
+            for level, rect in self.red_level_buttons:
+                self._draw_button(screen, rect, level, selected=(level == self.selected_red_level))
+
+            for level, rect in self.black_level_buttons:
+                self._draw_button(screen, rect, level, selected=(level == self.selected_black_level))
+        else:
+            level_heading = self.heading_font.render("Choose Level", True, (30, 30, 30))
+            screen.blit(level_heading, (self.width // 2 - 90, 380))
+
+            for level, rect in self.level_buttons:
+                self._draw_button(screen, rect, level, selected=(level == self.selected_level))
 
         self._draw_button(screen, self.start_button, "Start", selected=False)
         self._draw_button(screen, self.quit_button, "Quit", selected=False)
 
         help_text_1 = self.small_font.render(
-            "Keyboard: 1/2/3 = mode, E/M/H = level, Enter = Start, Esc = Quit",
+            "Keyboard: 1/2/3 mode, E/M/H level, Q/W/E Red, A/S/D Black, Enter Start",
             True,
             (80, 80, 80),
         )
-        help_text_2 = self.small_font.render(
-            f"Current selection: {self.selected_mode} | {self.selected_level}",
+
+        if self.selected_mode == "AI vs AI":
+            current_text = (
+                f"Current: {self.selected_mode} | Red={self.selected_red_level} | "
+                f"Black={self.selected_black_level}"
+            )
+        else:
+            current_text = f"Current: {self.selected_mode} | {self.selected_level}"
+
+        help_text_2 = self.small_font.render(current_text, True, (80, 50, 30))
+        help_text_3 = self.small_font.render(
+            "AI strength order: Easy < Medium < Hard",
             True,
             (80, 50, 30),
         )
 
         screen.blit(help_text_1, (self.width // 2 - help_text_1.get_width() // 2, 690))
         screen.blit(help_text_2, (self.width // 2 - help_text_2.get_width() // 2, 715))
+        screen.blit(help_text_3, (self.width // 2 - help_text_3.get_width() // 2, 740))

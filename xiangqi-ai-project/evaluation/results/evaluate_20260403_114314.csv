@@ -1,0 +1,7 @@
+matchup,game_index,red_agent,black_agent,winner,reason,plies,elapsed_ms
+easy_vs_random,1,EasyAgent,RandomAgent,draw,max_turns_reached,30,320
+random_vs_easy,1,RandomAgent,EasyAgent,draw,max_turns_reached,30,355
+medium_vs_random,1,MediumAgent,RandomAgent,draw,max_turns_reached,30,2854
+random_vs_medium,1,RandomAgent,MediumAgent,draw,max_turns_reached,30,5140
+hard_vs_random,1,HardAgent,RandomAgent,draw,max_turns_reached,30,26966
+random_vs_hard,1,RandomAgent,HardAgent,draw,max_turns_reached,30,40674

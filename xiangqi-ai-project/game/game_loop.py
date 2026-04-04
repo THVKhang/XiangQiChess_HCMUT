@@ -51,8 +51,20 @@ class GameLoop:
     def current_agent(self) -> AgentLike:
         return self.red_agent if self.state.side_to_move == Color.RED else self.black_agent
 
+    def _position_key(self) -> tuple[str, tuple[tuple[tuple[int, int], str, str], ...]]:
+        pieces: list[tuple[tuple[int, int], str, str]] = []
+        for pos, piece in self.state.board.squares():
+            if piece is None:
+                continue
+            pieces.append((pos, piece.color.value, piece.kind.value))
+        pieces.sort()
+        return self.state.side_to_move.value, tuple(pieces)
+
     def play(self) -> GameLoopResult:
         history: list[TurnRecord] = []
+        position_counts: dict[tuple[str, tuple[tuple[tuple[int, int], str, str], ...]], int] = {
+            self._position_key(): 1
+        }
 
         for ply in range(self.max_turns):
             terminal = result_if_terminal(self.state)
@@ -87,6 +99,16 @@ class GameLoop:
 
             assert_legal_move(self.state, move)
             self.state.apply_move(move)
+
+            key = self._position_key()
+            position_counts[key] = position_counts.get(key, 0) + 1
+            if position_counts[key] >= 3:
+                return GameLoopResult(
+                    final_state=self.state,
+                    winner=None,
+                    reason="threefold_repetition",
+                    history=history,
+                )
 
         return GameLoopResult(
             final_state=self.state,

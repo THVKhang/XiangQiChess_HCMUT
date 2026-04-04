@@ -1,0 +1,186 @@
+{
+  "timestamp": "20260403_115544",
+  "total_games": 18,
+  "records": [
+    {
+      "matchup": "easy_vs_random",
+      "game_index": 1,
+      "red_agent": "EasyAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 950
+    },
+    {
+      "matchup": "random_vs_easy",
+      "game_index": 1,
+      "red_agent": "RandomAgent",
+      "black_agent": "EasyAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 813
+    },
+    {
+      "matchup": "easy_vs_random",
+      "game_index": 2,
+      "red_agent": "EasyAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 780
+    },
+    {
+      "matchup": "random_vs_easy",
+      "game_index": 2,
+      "red_agent": "RandomAgent",
+      "black_agent": "EasyAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 858
+    },
+    {
+      "matchup": "easy_vs_random",
+      "game_index": 3,
+      "red_agent": "EasyAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 985
+    },
+    {
+      "matchup": "random_vs_easy",
+      "game_index": 3,
+      "red_agent": "RandomAgent",
+      "black_agent": "EasyAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 955
+    },
+    {
+      "matchup": "medium_vs_random",
+      "game_index": 1,
+      "red_agent": "MediumAgent",
+      "black_agent": "RandomAgent",
+      "winner": "red",
+      "reason": "checkmate",
+      "plies": 17,
+      "elapsed_ms": 2805
+    },
+    {
+      "matchup": "random_vs_medium",
+      "game_index": 1,
+      "red_agent": "RandomAgent",
+      "black_agent": "MediumAgent",
+      "winner": "draw",
+      "reason": "stalemate",
+      "plies": 94,
+      "elapsed_ms": 11637
+    },
+    {
+      "matchup": "medium_vs_random",
+      "game_index": 2,
+      "red_agent": "MediumAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 13554
+    },
+    {
+      "matchup": "random_vs_medium",
+      "game_index": 2,
+      "red_agent": "RandomAgent",
+      "black_agent": "MediumAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 21421
+    },
+    {
+      "matchup": "medium_vs_random",
+      "game_index": 3,
+      "red_agent": "MediumAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "stalemate",
+      "plies": 63,
+      "elapsed_ms": 9771
+    },
+    {
+      "matchup": "random_vs_medium",
+      "game_index": 3,
+      "red_agent": "RandomAgent",
+      "black_agent": "MediumAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 14080
+    },
+    {
+      "matchup": "hard_vs_random",
+      "game_index": 1,
+      "red_agent": "HardAgent",
+      "black_agent": "RandomAgent",
+      "winner": "red",
+      "reason": "checkmate",
+      "plies": 39,
+      "elapsed_ms": 32265
+    },
+    {
+      "matchup": "random_vs_hard",
+      "game_index": 1,
+      "red_agent": "RandomAgent",
+      "black_agent": "HardAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 101823
+    },
+    {
+      "matchup": "hard_vs_random",
+      "game_index": 2,
+      "red_agent": "HardAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "stalemate",
+      "plies": 71,
+      "elapsed_ms": 27340
+    },
+    {
+      "matchup": "random_vs_hard",
+      "game_index": 2,
+      "red_agent": "RandomAgent",
+      "black_agent": "HardAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 92583
+    },
+    {
+      "matchup": "hard_vs_random",
+      "game_index": 3,
+      "red_agent": "HardAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 62832
+    },
+    {
+      "matchup": "random_vs_hard",
+      "game_index": 3,
+      "red_agent": "RandomAgent",
+      "black_agent": "HardAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 140,
+      "elapsed_ms": 100526
+    }
+  ]
+}

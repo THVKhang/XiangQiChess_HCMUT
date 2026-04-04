@@ -2,10 +2,13 @@ import time
 from typing import Optional
 
 from agents.base_agent import BaseAgent
-from core.move_generator import legal_moves
+from core.move_generator import legal_moves, result_if_terminal
 from core.state import GameState
 from core.move import Move
 from core.rules import Color, PieceType, on_own_side_of_river
+
+MATE_SCORE = 1_000_000
+BACKTRACK_PENALTY = 1_500
 
 # Bảng giá trị cơ bản của các quân cờ
 PIECE_VALUES = {
@@ -85,6 +88,31 @@ def advanced_evaluate(state: GameState, player_id):
             
     return score
 
+
+def terminal_utility(state: GameState, player_id, depth: int) -> int:
+    """
+    Điểm terminal tuyệt đối để search ưu tiên thắng/thua đúng nghĩa.
+    - Thắng: điểm rất lớn dương (ưu tiên chiếu bí sớm hơn).
+    - Thua: điểm rất lớn âm (tránh bị chiếu bí).
+    - Hòa: 0.
+    """
+    terminal = result_if_terminal(state)
+    if terminal is None or terminal.winner is None:
+        return 0
+    bonus = depth  # cùng thắng thì thắng sớm tốt hơn
+    if terminal.winner == player_id:
+        return MATE_SCORE + bonus
+    return -MATE_SCORE - bonus
+
+
+def is_simple_backtrack(state: GameState, move: Move) -> bool:
+    """Phạt nhẹ nước đi quay đầu đúng kiểu vừa đi xong rồi đi lại chỗ cũ ở lượt kế tiếp của chính mình."""
+    if len(state.move_history) < 2:
+        return False
+    last_own = state.move_history[-2]
+    return last_own.src == move.dst and last_own.dst == move.src
+
+
 class MinimaxAgent(BaseAgent):
     """
     Agent sử dụng thuật toán Minimax cơ bản (không cắt tỉa) để chọn nước đi.
@@ -104,10 +132,17 @@ class MinimaxAgent(BaseAgent):
             # Clone state hiện tại để thử nghiệm nước đi
             next_state = state.clone()
             next_state.apply_move(move)
+
+            immediate = result_if_terminal(next_state)
+            if immediate is not None and immediate.winner == self.player_id:
+                return move
             
             # apply_move sẽ tự động đổi lượt trong state, 
             # nên state kế tiếp thuộc về đối thủ (MIN)
             score = self.minimax(next_state, self.depth - 1, False)
+
+            if is_simple_backtrack(state, move):
+                score -= BACKTRACK_PENALTY
             
             if score > best_score:
                 best_score = score
@@ -116,14 +151,16 @@ class MinimaxAgent(BaseAgent):
         return best_move
 
     def minimax(self, state, depth, is_maximizing_player):
-        # Nếu đạt độ sâu tối đa hoặc trận đấu kết thúc
-        if depth == 0 or state.is_terminal():
+        if depth == 0:
+            terminal = result_if_terminal(state)
+            if terminal is not None:
+                return terminal_utility(state, self.player_id, depth)
             return self.evaluate(state)
 
         moves = legal_moves(state)
         # Nếu không còn nước đi hợp lệ (bị chiếu bí hoặc cờ hòa)
         if not moves:
-            return self.evaluate(state)
+            return terminal_utility(state, self.player_id, depth)
 
         if is_maximizing_player:
             best_score = float('-inf')
@@ -189,8 +226,15 @@ class AlphaBetaAgent(BaseAgent):
         for move in moves:
             next_state = state.clone()
             next_state.apply_move(move)
+
+            immediate = result_if_terminal(next_state)
+            if immediate is not None and immediate.winner == self.player_id:
+                return move
             
             score = self.alpha_beta(next_state, self.depth - 1, alpha, beta, False)
+
+            if is_simple_backtrack(state, move):
+                score -= BACKTRACK_PENALTY
             
             if score > best_score:
                 best_score = score
@@ -231,14 +275,18 @@ class AlphaBetaAgent(BaseAgent):
                 return tt_entry['value']
 
         original_alpha = alpha
+        original_beta = beta
 
-        if depth == 0 or state.is_terminal():
+        if depth == 0:
+            terminal = result_if_terminal(state)
+            if terminal is not None:
+                return terminal_utility(state, self.player_id, depth)
             return self.cached_evaluate(state)
 
         moves = legal_moves(state)
         moves = self.order_moves(state, moves)
         if not moves:
-            return self.cached_evaluate(state)
+            return terminal_utility(state, self.player_id, depth)
 
         if is_maximizing_player:
             best_score = float('-inf')
@@ -264,7 +312,7 @@ class AlphaBetaAgent(BaseAgent):
         # Ghi nhận vào Transposition Table
         if best_score <= original_alpha:
             flag = 'UPPERBOUND'
-        elif best_score >= beta:
+        elif best_score >= original_beta:
             flag = 'LOWERBOUND'
         else:
             flag = 'EXACT'

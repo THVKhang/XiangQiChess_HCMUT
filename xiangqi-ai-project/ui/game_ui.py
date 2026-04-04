@@ -21,7 +21,11 @@ class GameUI:
 
         self.mode = "Human vs AI"
         self.level = "Easy"
+        self.red_level = "Easy"
+        self.black_level = "Easy"
         self.status_message = "Waiting for game state..."
+        self.game_over_message = None
+        self.human_input_enabled = True
         self.selected_cell = None
         self.hover_cell = None
         self.hovered_button = None
@@ -68,11 +72,46 @@ class GameUI:
         self.piece_theme = self.piece_themes[self.piece_theme_index]
         self.load_piece_images()
         self.theme_transition_timer_ms = self.theme_transition_duration_ms
-        self.status_message = f"Theme quân: {self.piece_theme}"
+        self.status_message = f"Piece theme: {self.piece_theme}"
 
-    def set_mode_and_level(self, mode: str, level: str):
+    def set_mode_and_level(self, mode: str, level: str, red_level: str = None, black_level: str = None):
         self.mode = mode
         self.level = level
+        self.red_level = red_level or level
+        self.black_level = black_level or level
+
+    def _level_strength_text(self):
+        level_map = {
+            "Easy": "weak (Level 1, depth 1)",
+            "Medium": "average (Level 4, depth 2)",
+            "Hard": "strong (Level 8, depth 3 + ordering)",
+        }
+        return level_map.get(self.level, "unknown")
+
+    def _ai_strength_lines(self):
+        rank_line = "AI strength: Easy < Medium < Hard"
+        current_line = f"Current level: {self.level} ({self._level_strength_text()})"
+
+        if self.mode == "Human vs AI":
+            mode_line = "Setup: Red = Human, Black = Search AI"
+            difficulty_line = "Difficulty applies to Black AI only"
+        elif self.mode == "AI vs Random":
+            mode_line = "Setup: Red = Search AI, Black = RandomAgent"
+            difficulty_line = "Difficulty applies to Red AI only"
+        elif self.mode == "AI vs AI":
+            mode_line = "Setup: Red = Search AI, Black = Search AI"
+            difficulty_line = "Difficulty applies to BOTH Red and Black"
+        else:
+            mode_line = "AI setup depends on menu mode"
+            difficulty_line = "Difficulty mapping unavailable"
+
+        return [rank_line, current_line, mode_line, difficulty_line]
+
+    def set_human_input_enabled(self, enabled: bool):
+        self.human_input_enabled = enabled
+
+    def set_game_over_message(self, message):
+        self.game_over_message = message
 
     def set_state(self, state):
         self.state = state
@@ -319,6 +358,9 @@ class GameUI:
 
             clicked_cell = self.screen_to_board(mouse_pos)
             if clicked_cell is not None:
+                if not self.human_input_enabled:
+                    self.status_message = "AI is thinking..."
+                    return None
                 self._handle_board_click(clicked_cell)
 
         elif event.type == pygame.KEYDOWN:
@@ -347,11 +389,22 @@ class GameUI:
             self.selected_cell = cell
             if self.state and hasattr(self.state, "get_legal_moves"):
                 try:
-                    self.legal_moves = self.state.get_legal_moves(cell)
-                    self.legal_moves_anim_ms = 0
+                    legal = self.state.get_legal_moves(cell)
+                except TypeError:
+                    legal = self.state.get_legal_moves()
                 except Exception:
-                    self.legal_moves = []
-                    self.legal_moves_anim_ms = 0
+                    legal = []
+
+                normalized = []
+                for move in legal:
+                    if isinstance(move, tuple) and len(move) == 2:
+                        normalized.append(move)
+                    elif hasattr(move, "to_row") and hasattr(move, "to_col"):
+                        normalized.append((move.to_row, move.to_col))
+                    elif hasattr(move, "src") and hasattr(move, "dst") and move.src == cell:
+                        normalized.append(move.dst)
+                self.legal_moves = normalized
+                self.legal_moves_anim_ms = 0
             else:
                 self.legal_moves = []
                 self.legal_moves_anim_ms = 0
@@ -401,8 +454,16 @@ class GameUI:
             return moved
 
         if hasattr(self.state, "apply_move"):
-            move_obj = self._build_simple_move(from_row, from_col, to_row, to_col)
             try:
+                try:
+                    from core.move import Move
+                    from core.move_generator import assert_legal_move
+
+                    move_obj = Move(src=(from_row, from_col), dst=(to_row, to_col))
+                    assert_legal_move(self.state, move_obj)
+                except Exception:
+                    move_obj = self._build_simple_move(from_row, from_col, to_row, to_col)
+
                 result = self.state.apply_move(move_obj)
                 if hasattr(self.state, "current_player"):
                     self.state.current_player = "black" if self.state.current_player == "red" else "red"
@@ -442,7 +503,10 @@ class GameUI:
     def _get_piece_at(self, row, col):
         if self.state is None or not hasattr(self.state, "board"):
             return None
-        return self.state.board[row][col]
+        board = self.state.board
+        if hasattr(board, "get"):
+            return board.get((row, col))
+        return board[row][col]
 
     def _extract_piece_info(self, piece):
         if piece is None:
@@ -470,7 +534,10 @@ class GameUI:
         color = None
         for attr in ["color", "side", "team", "owner"]:
             if hasattr(piece, attr):
-                raw = str(getattr(piece, attr)).lower()
+                raw_value = getattr(piece, attr)
+                if hasattr(raw_value, "value"):
+                    raw_value = raw_value.value
+                raw = str(raw_value).lower()
                 if "red" in raw or raw == "r":
                     color = "red"
                 elif "black" in raw or raw == "b":
@@ -480,7 +547,10 @@ class GameUI:
         piece_type = None
         for attr in ["piece_type", "type", "kind", "name", "symbol"]:
             if hasattr(piece, attr):
-                piece_type = str(getattr(piece, attr))
+                raw_type = getattr(piece, attr)
+                if hasattr(raw_type, "value"):
+                    raw_type = raw_type.value
+                piece_type = str(raw_type)
                 break
 
         label_map = {
@@ -509,6 +579,8 @@ class GameUI:
         label = "?"
         if piece_type is not None:
             normalized = piece_type.lower()
+            if "." in normalized:
+                normalized = normalized.split(".")[-1]
             label = label_map.get(normalized, normalized[:1].upper())
 
         if color is None:
@@ -589,7 +661,7 @@ class GameUI:
         step = max(5, int(self.cell_size * 0.12))
         for y in range(0, board_rect.height, step):
             alpha = 30 if (y // step) % 2 == 0 else 18
-            pygame.draw.line(grain, (120, 86, 46, alpha), (0, y), (board_rect.width, y), 1)
+            pygame.draw.line(grain, (112, 82, 46, alpha), (0, y), (board_rect.width, y), 1)
 
         # Add faint vertical shading so the board has more depth at a glance.
         for x in range(0, board_rect.width, max(8, step * 2)):
@@ -728,7 +800,7 @@ class GameUI:
 
         for row in range(self.rows):
             for col in range(self.cols):
-                piece = self.state.board[row][col]
+                piece = self._get_piece_at(row, col)
                 if piece is None:
                     continue
 
@@ -834,7 +906,7 @@ class GameUI:
     def draw_move_history(self, screen, x, y, max_width, max_bottom):
         if not self.move_history:
             return y
-        y, ok = self.render_text_lines(screen, "Lịch sử:", self.small_font, (40, 40, 40), x, y, max_width, max_bottom)
+        y, ok = self.render_text_lines(screen, "History:", self.small_font, (40, 40, 40), x, y, max_width, max_bottom)
         if not ok:
             return y
         for i, move in enumerate(self.move_history[-8:]):
@@ -858,7 +930,7 @@ class GameUI:
         x = self.side_panel_x + pad_x
         max_text_w = self.side_panel_w - 2 * pad_x
 
-        title = self.title_font.render("CỜ TƯỚNG", True, palette["title"])
+        title = self.title_font.render("XIANGQI", True, palette["title"])
         title_x = self.side_panel_x + (self.side_panel_w - title.get_width()) // 2
         y = self.side_panel_y + 14
         screen.blit(title, (title_x, y))
@@ -867,22 +939,22 @@ class GameUI:
         current_turn = "Unknown"
         if self.state is not None and hasattr(self.state, "current_player"):
             current_turn = str(self.state.current_player)
+        elif self.state is not None and hasattr(self.state, "side_to_move"):
+            current_turn = str(self.state.side_to_move.value)
 
         info_lines = [
-            f"Chế độ: {self.mode}",
-            f"Cấp độ: {self.level}",
-            f"Lượt: {current_turn}",
-            f"Chọn: {self.selected_cell}",
-            f"Theme quân: {self.piece_theme}",
+            f"Mode: {self.mode}",
+            f"Level: {self.level}" if self.mode != "AI vs AI" else f"Red AI: Heuristic(AB) {self.red_level}",
+            f"Black AI: Depth(Minimax) {self.black_level}" if self.mode == "AI vs AI" else "",
+            f"Turn: {current_turn}",
+            f"Selected: {self.selected_cell}",
+            f"Piece theme: {self.piece_theme}",
             "",
-            "Điều khiển:",
-            "- Click: chọn/quân",
-            "- R: reset",
-            "- U: undo",
-            "- N: ván mới",
-            "- F11: phóng to",
-            "- ESC: menu",
-            "- G: đổi theme quân",
+            "Controls:",
+            "- Click: move",
+            "- R/U/N: reset/undo/new",
+            "- F11/ESC: fullscreen/menu",
+            "- G: piece theme",
         ]
 
         # Keep text above buttons with a safe gap
@@ -893,7 +965,7 @@ class GameUI:
                 break
 
         y += 6
-        y, ok = self.render_text_lines(screen, "Trạng thái:", self.text_font, palette["info_text"], x, y, max_text_w, text_bottom_limit)
+        y, ok = self.render_text_lines(screen, "Status:", self.text_font, palette["info_text"], x, y, max_text_w, text_bottom_limit)
         if ok:
             self.render_text_lines(screen, self.status_message, self.small_font, palette["status_text"], x, y, max_text_w, text_bottom_limit)
 
@@ -921,7 +993,7 @@ class GameUI:
         self._draw_button(
             screen,
             self.newgame_button,
-            "Ván mới",
+            "New Game",
             palette,
             self.hovered_button == self.newgame_button,
             self.pressed_button == self.newgame_button,
@@ -937,7 +1009,7 @@ class GameUI:
         self._draw_button(
             screen,
             self.fullscreen_button,
-            "Phóng to",
+            "Fullscreen",
             palette,
             self.hovered_button == self.fullscreen_button,
             self.pressed_button == self.fullscreen_button,
@@ -945,11 +1017,32 @@ class GameUI:
         self._draw_button(
             screen,
             self.theme_button,
-            "Theme quân",
+            "Piece Theme",
             palette,
             self.hovered_button == self.theme_button,
             self.pressed_button == self.theme_button,
         )
+
+    def _draw_game_over_banner(self, screen):
+        if not self.game_over_message:
+            return
+
+        overlay = pygame.Surface((self.board_width, self.board_height), pygame.SRCALPHA)
+        pygame.draw.rect(overlay, (15, 10, 8, 95), (0, 0, self.board_width, self.board_height), border_radius=10)
+        screen.blit(overlay, (self.board_left, self.board_top))
+
+        banner_w = min(self.board_width - 20, 560)
+        banner_h = 92
+        banner_x = self.board_left + (self.board_width - banner_w) // 2
+        banner_y = self.board_top + (self.board_height - banner_h) // 2
+        banner_rect = pygame.Rect(banner_x, banner_y, banner_w, banner_h)
+
+        pygame.draw.rect(screen, (248, 236, 206), banner_rect, border_radius=14)
+        pygame.draw.rect(screen, (108, 74, 40), banner_rect, width=3, border_radius=14)
+
+        msg_surface = self.title_font.render(self.game_over_message, True, (82, 36, 24))
+        msg_rect = msg_surface.get_rect(center=banner_rect.center)
+        screen.blit(msg_surface, msg_rect)
 
     def draw(self, screen):
         screen.fill(self.background_color)
@@ -962,5 +1055,6 @@ class GameUI:
         self._draw_legal_moves(screen)
         self._draw_pieces_from_state(screen)
         self._draw_side_panel(screen)
+        self._draw_game_over_banner(screen)
         self._draw_theme_transition(screen)
 

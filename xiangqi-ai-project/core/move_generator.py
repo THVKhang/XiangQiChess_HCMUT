@@ -217,9 +217,19 @@ class GameResult:
 def result_if_terminal(state: GameState) -> Optional[GameResult]:
     """
     Terminal tối thiểu:
+    - **General captured**: bên còn tướng thắng ngay.
     - **Checkmate**: bên tới lượt không có nước hợp lệ và đang bị chiếu.
     - **Stalemate**: bên tới lượt không có nước hợp lệ và không bị chiếu (tính là hòa).
     """
+    red_g = find_general(state.board.get, Color.RED)
+    black_g = find_general(state.board.get, Color.BLACK)
+    if red_g is None and black_g is None:
+        return GameResult(winner=None, reason="both_generals_missing")
+    if red_g is None:
+        return GameResult(winner=Color.BLACK, reason="general_captured")
+    if black_g is None:
+        return GameResult(winner=Color.RED, reason="general_captured")
+
     moves = legal_moves(state)
     if moves:
         return None
