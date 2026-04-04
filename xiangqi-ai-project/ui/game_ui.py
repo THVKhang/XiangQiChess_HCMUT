@@ -2,6 +2,21 @@ import os
 import math
 import pygame
 
+from core.move import Move
+from core.move_generator import is_legal_move
+from core.rules import Piece as RulesPiece, PieceType
+from core.state import GameState
+
+_PIECE_TYPE_TO_LABEL = {
+    PieceType.GENERAL: "K",
+    PieceType.ADVISOR: "A",
+    PieceType.ELEPHANT: "E",
+    PieceType.HORSE: "H",
+    PieceType.ROOK: "R",
+    PieceType.CANNON: "C",
+    PieceType.SOLDIER: "P",
+}
+
 
 class GameUI:
     def __init__(self, width: int, height: int):
@@ -83,10 +98,15 @@ class GameUI:
         self.last_move = None
         self.animating_piece = None
         self.status_message = "State connected to UI"
+        # Không đụng move_undo_stack: main giữ cùng một list và gán sau set_state;
+        # nếu gán None ở đây sẽ làm mất undo (append không bao giờ chạy).
 
     def reset_game(self):
         if self.state is not None and hasattr(self.state, "reset"):
             self.state.reset()
+        mus = getattr(self, "move_undo_stack", None)
+        if mus is not None:
+            mus.clear()
         self.selected_cell = None
         self.hover_cell = None
         self.legal_moves = []
@@ -330,7 +350,30 @@ class GameUI:
                 return "toggle_fullscreen"
             elif event.key == pygame.K_g:
                 self.cycle_piece_theme()
+            elif event.key == pygame.K_u:
+                return "undo_move"
         return None
+
+    def _set_selection_legal_moves(self, cell):
+        row, col = cell
+        self.legal_moves = []
+        self.legal_moves_anim_ms = 0
+        if self.state is None:
+            return
+        if isinstance(self.state, GameState):
+            for m in self.state.get_legal_moves():
+                if m.src == (row, col):
+                    self.legal_moves.append((m.dst[0], m.dst[1]))
+            return
+        if hasattr(self.state, "get_legal_moves"):
+            try:
+                self.legal_moves = self.state.get_legal_moves(cell)
+            except TypeError:
+                for m in self.state.get_legal_moves():
+                    if m.src == (row, col):
+                        self.legal_moves.append((m.dst[0], m.dst[1]))
+            except Exception:
+                self.legal_moves = []
 
     def _handle_board_click(self, cell):
         if self.state is None:
@@ -339,22 +382,17 @@ class GameUI:
 
         row, col = cell
         piece = self._get_piece_at(row, col)
+        active_side = self._active_side_str()
 
         if self.selected_cell is None:
             if piece is None:
                 self.status_message = f"Empty cell: {cell}"
                 return
+            if not self._piece_belongs_to_active_side(piece):
+                self.status_message = "Không phải lượt của quân này"
+                return
             self.selected_cell = cell
-            if self.state and hasattr(self.state, "get_legal_moves"):
-                try:
-                    self.legal_moves = self.state.get_legal_moves(cell)
-                    self.legal_moves_anim_ms = 0
-                except Exception:
-                    self.legal_moves = []
-                    self.legal_moves_anim_ms = 0
-            else:
-                self.legal_moves = []
-                self.legal_moves_anim_ms = 0
+            self._set_selection_legal_moves(cell)
             self.status_message = f"Selected piece at {cell}"
             return
 
@@ -366,6 +404,23 @@ class GameUI:
             return
 
         from_row, from_col = self.selected_cell
+        origin_piece = self._get_piece_at(from_row, from_col)
+        if not self._piece_belongs_to_active_side(origin_piece):
+            self.selected_cell = None
+            self.legal_moves = []
+            self.legal_moves_anim_ms = 0
+            self.status_message = "Lượt đã đổi — chọn lại quân của bạn"
+            return
+
+        # Click quân cùng phe khác ô: đổi chọn (không coi là nước đi tới ô có quân mình).
+        if piece is not None and active_side is not None:
+            _, dest_color, _ = self._extract_piece_info(piece)
+            if dest_color == active_side:
+                self.selected_cell = cell
+                self._set_selection_legal_moves(cell)
+                self.status_message = f"Selected piece at {cell}"
+                return
+
         moved = self._apply_ui_move(from_row, from_col, row, col)
         self.legal_moves = []
         self.legal_moves_anim_ms = 0
@@ -377,7 +432,13 @@ class GameUI:
             return False
 
         moving_piece = self._get_piece_at(from_row, from_col)
-        if moving_piece is not None:
+        if moving_piece is None or not self._piece_belongs_to_active_side(moving_piece):
+            return False
+
+        if isinstance(self.state, GameState):
+            move = Move((from_row, from_col), (to_row, to_col))
+            if not is_legal_move(self.state, move):
+                return False
             label, color_name, hanzi = self._extract_piece_info(moving_piece)
             self.animating_piece = {
                 "label": label,
@@ -389,8 +450,24 @@ class GameUI:
                 "duration": self.move_anim_duration_ms,
                 "to_cell": (to_row, to_col),
             }
-        else:
-            self.animating_piece = None
+            undo = self.state.apply_move(move)
+            mus = getattr(self, "move_undo_stack", None)
+            if mus is not None:
+                mus.append(undo)
+            self.last_move = ((from_row, from_col), (to_row, to_col))
+            return True
+
+        label, color_name, hanzi = self._extract_piece_info(moving_piece)
+        self.animating_piece = {
+            "label": label,
+            "color": color_name,
+            "hanzi": hanzi,
+            "from": self.board_to_screen(from_row, from_col),
+            "to": self.board_to_screen(to_row, to_col),
+            "elapsed": 0,
+            "duration": self.move_anim_duration_ms,
+            "to_cell": (to_row, to_col),
+        }
 
         if hasattr(self.state, "move_piece"):
             moved = self.state.move_piece(from_row, from_col, to_row, to_col)
@@ -400,28 +477,20 @@ class GameUI:
                 self.animating_piece = None
             return moved
 
-        if hasattr(self.state, "apply_move"):
-            move_obj = self._build_simple_move(from_row, from_col, to_row, to_col)
-            try:
-                result = self.state.apply_move(move_obj)
-                if hasattr(self.state, "current_player"):
-                    self.state.current_player = "black" if self.state.current_player == "red" else "red"
-                moved = result if isinstance(result, bool) else True
-                if moved:
-                    self.last_move = ((from_row, from_col), (to_row, to_col))
-                else:
-                    self.animating_piece = None
-                return moved
-            except Exception:
+        if hasattr(self.state, "board"):
+            b = self.state.board
+            if hasattr(b, "get"):
+                piece = b.get((from_row, from_col))
+            else:
+                piece = b[from_row][from_col]
+            if piece is None:
                 self.animating_piece = None
                 return False
-
-        if hasattr(self.state, "board"):
-            piece = self.state.board[from_row][from_col]
-            if piece is None:
-                return False
-            self.state.board[to_row][to_col] = piece
-            self.state.board[from_row][from_col] = None
+            if hasattr(b, "set") and hasattr(b, "move_piece"):
+                b.move_piece((from_row, from_col), (to_row, to_col))
+            else:
+                b[to_row][to_col] = piece
+                b[from_row][from_col] = None
             if hasattr(self.state, "current_player"):
                 self.state.current_player = "black" if self.state.current_player == "red" else "red"
             self.last_move = ((from_row, from_col), (to_row, to_col))
@@ -429,20 +498,40 @@ class GameUI:
 
         return False
 
-    def _build_simple_move(self, from_row, from_col, to_row, to_col):
-        class SimpleMove:
-            def __init__(self, fr, fc, tr, tc):
-                self.from_row = fr
-                self.from_col = fc
-                self.to_row = tr
-                self.to_col = tc
-
-        return SimpleMove(from_row, from_col, to_row, to_col)
-
     def _get_piece_at(self, row, col):
         if self.state is None or not hasattr(self.state, "board"):
             return None
-        return self.state.board[row][col]
+        b = self.state.board
+        if hasattr(b, "get"):
+            return b.get((row, col))
+        return b[row][col]
+
+    def _active_side_str(self):
+        """'red' | 'black' | None — hỗ trợ DemoState.current_player và GameState.side_to_move."""
+        if self.state is None:
+            return None
+        if hasattr(self.state, "side_to_move"):
+            v = self.state.side_to_move
+            if hasattr(v, "value"):
+                return str(v.value).lower()
+            s = str(v).lower()
+            if s.endswith("red") or s == "red":
+                return "red"
+            if s.endswith("black") or s == "black":
+                return "black"
+            return s
+        if hasattr(self.state, "current_player"):
+            return str(self.state.current_player).lower()
+        return None
+
+    def _piece_belongs_to_active_side(self, piece) -> bool:
+        if piece is None:
+            return False
+        active = self._active_side_str()
+        if active is None:
+            return True
+        _, color_name, _ = self._extract_piece_info(piece)
+        return color_name == active
 
     def _extract_piece_info(self, piece):
         if piece is None:
@@ -457,6 +546,12 @@ class GameUI:
             "C": ("炮", "砲"),
             "P": ("兵", "卒"),
         }
+
+        if isinstance(piece, RulesPiece):
+            color_name = piece.color.value
+            label = _PIECE_TYPE_TO_LABEL.get(piece.kind, "?")
+            hanzi = hanzi_map.get(label, (label, label))[0 if color_name == "red" else 1]
+            return label, color_name, hanzi
 
         if isinstance(piece, str):
             if len(piece) >= 2:
@@ -728,7 +823,7 @@ class GameUI:
 
         for row in range(self.rows):
             for col in range(self.cols):
-                piece = self.state.board[row][col]
+                piece = self._get_piece_at(row, col)
                 if piece is None:
                     continue
 

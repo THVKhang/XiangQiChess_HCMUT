@@ -60,6 +60,12 @@ class GameState:
         if self.move_history:
             self.move_history.pop()
 
+    def reset(self) -> None:
+        """Ván mới: bàn chuẩn, Đỏ đi trước, xóa lịch sử."""
+        self.board = Board.initial()
+        self.side_to_move = Color.RED
+        self.move_history.clear()
+
     def get_legal_moves(self) -> list[Move]:
         from .move_generator import legal_moves
         return legal_moves(self)
