@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from agents.human_player import HumanPlayer
+from agents.ml_agent import DummyMoveScoringModel, MLAgent
 from agents.random_agent import RandomAgent
 from core.move import Move
 from core.move_generator import legal_moves
@@ -142,6 +143,31 @@ class TestGameLoop(unittest.TestCase):
         loop.state.side_to_move = Color.BLACK
         self.assertEqual(loop.current_agent().player_id, Color.BLACK)
 
+
+    def test_ml_agent_dummy_model_returns_legal_move(self):
+        state = GameState()
+        agent = MLAgent(player_id=Color.RED, model=DummyMoveScoringModel())
+
+        move = agent.select_move(state)
+
+        self.assertIn(move, legal_moves(state))
+
+    def test_ml_agent_runs_inside_headless_game_loop(self):
+        result = run_game(
+            MLAgent(player_id=Color.RED, model=DummyMoveScoringModel()),
+            RandomAgent(player_id=Color.BLACK, rng=random.Random(11)),
+            max_turns=4,
+        )
+
+        self.assertEqual(result.reason, "max_turns_reached")
+        self.assertEqual(len(result.history), 4)
+        self.assertEqual(result.history[0].agent_name, "MLAgent")
+
+    def test_ml_agent_rejects_wrong_turn_color(self):
+        agent = MLAgent(player_id=Color.BLACK, model=DummyMoveScoringModel())
+
+        with self.assertRaises(ValueError):
+            agent.select_move(GameState())
 
 if __name__ == "__main__":
     unittest.main()

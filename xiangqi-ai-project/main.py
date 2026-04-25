@@ -1,6 +1,7 @@
 import sys
 import pygame
 
+from agents.ml_agent import MLAgent
 from agents.random_agent import RandomAgent
 from agents.search_agent import EasyAgent, HardAgent, MediumAgent
 from core.move import Move
@@ -25,18 +26,29 @@ def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
     agent_cls = level_map.get(level, EasyAgent)
     return agent_cls(player_id=color, algorithm=algorithm)
 
+def _build_ml_agent(color: Color, model_path: str = None):
+    # Week 1: model_path is optional. Without a trained file, MLAgent loads a dummy model.
+    return MLAgent(player_id=color, model_path=model_path)
+
 
 def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None):
     if mode == "Human vs AI":
         return Color.RED, None, _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
+    if mode == "Human vs ML":
+        return Color.RED, None, _build_ml_agent(Color.BLACK)
     if mode == "AI vs Random":
         return None, _build_search_agent(level, Color.RED, algorithm="alphabeta"), RandomAgent(player_id=Color.BLACK)
+    if mode == "ML vs Random":
+        return None, _build_ml_agent(Color.RED), RandomAgent(player_id=Color.BLACK)
+    if mode == "ML vs Search":
+        return None, _build_ml_agent(Color.RED), _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
     if mode == "AI vs AI":
         red_lv = red_level or level
         black_lv = black_level or level
         red_agent = _build_search_agent(red_lv, Color.RED, algorithm="alphabeta")
         black_agent = _build_search_agent(black_lv, Color.BLACK, algorithm="minimax")
         return None, red_agent, black_agent
+
     return Color.RED, None, _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
 
 
