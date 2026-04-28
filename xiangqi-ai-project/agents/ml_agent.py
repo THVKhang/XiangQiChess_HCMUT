@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import random
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,7 +10,7 @@ from typing import Any, Optional, Protocol, Sequence
 from agents.base_agent import BaseAgent
 from core.encoding import state_to_tensor
 from core.move import Move
-from core.move_generator import legal_moves
+from core.move_generator import is_legal_move, legal_moves
 from core.rules import BOARD_COLS, BOARD_ROWS, Color
 from core.state import GameState
 
@@ -139,6 +140,32 @@ class MLAgent(BaseAgent):
             )
         raise ValueError(f"Unsupported ML model format: {model_path.suffix}")
 
+    def _filtered_legal_moves(self, state: GameState) -> list[Move]:
+        # Defensive filter: keep only moves accepted by the rule engine.
+        return [mv for mv in legal_moves(state) if is_legal_move(state, mv)]
+
+    def _safe_score_moves(self, state_tensor: Any, moves: Sequence[Move]) -> list[float]:
+        try:
+            raw_scores = list(self.model.score_moves(state_tensor, moves))
+        except Exception:
+            # Model failure should not break gameplay; fallback to neutral scores.
+            return [0.0] * len(moves)
+
+        if len(raw_scores) != len(moves):
+            # Invalid shape from model => fallback to deterministic legal choice.
+            return [0.0] * len(moves)
+
+        safe_scores: list[float] = []
+        for score in raw_scores:
+            try:
+                value = float(score)
+            except Exception:
+                value = float("-inf")
+            if not math.isfinite(value):
+                value = float("-inf")
+            safe_scores.append(value)
+        return safe_scores
+
     def select_move(self, state: GameState) -> Optional[Move]:
         if state.side_to_move != self.player_id:
             raise ValueError(
@@ -146,7 +173,7 @@ class MLAgent(BaseAgent):
                 f"but it was initialized for {self.player_id.value}."
             )
 
-        moves = legal_moves(state)
+        moves = self._filtered_legal_moves(state)
         if not moves:
             return None
 
@@ -156,12 +183,7 @@ class MLAgent(BaseAgent):
             canonical=True,
             as_numpy=False,
         )
-        scores = list(self.model.score_moves(state_tensor, moves))
-        if len(scores) != len(moves):
-            raise ValueError(
-                f"{self.name} model returned {len(scores)} scores for {len(moves)} legal moves."
-            )
-
-        # Stable argmax. If all scores are equal, keep the first legal move.
-        best_idx = max(range(len(moves)), key=lambda i: scores[i])
+        safe_scores = self._safe_score_moves(state_tensor, moves)
+        # Stable argmax. If all scores are equal/invalid, keep the first legal move.
+        best_idx = max(range(len(moves)), key=lambda i: safe_scores[i])
         return moves[best_idx]
