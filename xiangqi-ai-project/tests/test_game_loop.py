@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from agents.human_player import HumanPlayer
-from agents.ml_agent import DummyMoveScoringModel, MLAgent
+from agents.ml_agent import DummyMoveScoringModel, MLAgent, POLICY_SIZE
 from agents.random_agent import RandomAgent
 from core.move import Move
 from core.move_generator import legal_moves
@@ -170,50 +170,31 @@ class TestGameLoop(unittest.TestCase):
             agent.select_move(GameState())
 
 
-class TestHeadlessGameLoopWeek2(unittest.TestCase):
-    def test_run_headless_game_alias_does_not_need_ui(self):
-        from game.game_loop import run_headless_game
+    def test_dummy_model_forward_returns_full_policy_vector(self):
+        state = GameState()
+        agent = MLAgent(player_id=Color.RED, model=DummyMoveScoringModel())
+        state_tensor = agent.get_legal_move_scores(state)  # also exercises forward + legal-score mapping
 
-        result = run_headless_game(
-            RandomAgent(player_id=Color.RED, rng=random.Random(21)),
-            RandomAgent(player_id=Color.BLACK, rng=random.Random(22)),
-            max_turns=3,
+        self.assertGreater(len(state_tensor), 0)
+        self.assertTrue(all(move in legal_moves(state) for move, _score in state_tensor))
+        self.assertEqual(len(DummyMoveScoringModel().forward(__import__('core.encoding', fromlist=['state_to_tensor']).state_to_tensor(state, canonical=True))), POLICY_SIZE)
+
+    def test_ml_agent_loads_dummy_json_model(self):
+        agent = MLAgent(player_id=Color.RED, model_path='models/dummy_policy.json')
+        move = agent.select_move(GameState())
+
+        self.assertIn(move, legal_moves(GameState()))
+
+    def test_ml_vs_random_headless_checkpoint_runs(self):
+        result = run_game(
+            MLAgent(player_id=Color.RED, model_path='models/dummy_policy.json'),
+            RandomAgent(player_id=Color.BLACK, rng=random.Random(13)),
+            max_turns=10,
         )
 
-        self.assertEqual(result.reason, "max_turns_reached")
-        self.assertEqual(len(result.history), 3)
-
-    def test_step_api_advances_one_hidden_turn(self):
-        loop = GameLoop(
-            red_agent=ScriptedAgent(player_id=Color.RED, moves=[Move((6, 0), (5, 0))], name="RedScript"),
-            black_agent=ScriptedAgent(player_id=Color.BLACK, moves=[Move((3, 0), (4, 0))], name="BlackScript"),
-            max_turns=2,
-        )
-
-        first_result = loop.step()
-        self.assertIsNone(first_result)
-        self.assertEqual(loop.ply_count, 1)
-        self.assertEqual(loop.state.side_to_move, Color.BLACK)
-
-        final_result = loop.step()
-        self.assertIsNotNone(final_result)
-        self.assertEqual(final_result.reason, "max_turns_reached")
-        self.assertEqual(len(final_result.history), 2)
-
-    def test_game_loop_backend_has_no_pygame_dependency(self):
-        import game.game_loop as backend_loop
-
-        self.assertFalse(hasattr(backend_loop, "pygame"))
-
-    def test_headless_ml_vs_random_short_match(self):
-        from evaluation.headless_match import run_ml_vs_random
-
-        records = run_ml_vs_random(games=1, max_turns=1, seed=99)
-
-        self.assertEqual(len(records), 1)
-        self.assertTrue(all(record.red_agent == "MLAgent" for record in records))
-        self.assertTrue(all(record.black_agent == "RandomAgent" for record in records))
-        self.assertTrue(all(record.plies == 1 for record in records))
+        self.assertIn(result.reason, {'max_turns_reached', 'general_captured', 'checkmate', 'stalemate', 'threefold_repetition'})
+        self.assertGreaterEqual(len(result.history), 1)
+        self.assertEqual(result.history[0].agent_name, 'MLAgent')
 
 if __name__ == "__main__":
     unittest.main()

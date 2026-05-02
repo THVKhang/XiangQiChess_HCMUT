@@ -1,0 +1,6 @@
+{
+  "model_type": "DummyPolicyModel",
+  "capture_bonus": 100.0,
+  "center_bonus": 1.0,
+  "forward_bonus": 0.25
+}
