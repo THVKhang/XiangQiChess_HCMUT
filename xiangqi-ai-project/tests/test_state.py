@@ -15,6 +15,14 @@ class TestGameState(unittest.TestCase):
         self.assertEqual(red_rook.kind, PieceType.ROOK)
         self.assertEqual(self.state.side_to_move, Color.RED)
 
+    def test_reset(self):
+        self.state.apply_move(Move((6, 0), (5, 0)))
+        self.assertEqual(self.state.side_to_move, Color.BLACK)
+        self.state.reset()
+        self.assertEqual(self.state.side_to_move, Color.RED)
+        self.assertEqual(len(self.state.move_history), 0)
+        self.assertIsNotNone(self.state.board.get((6, 0)))
+
     def test_apply_move_logic(self):
         src, dst = (6, 0), (5, 0)
         move = Move(src=src, dst=dst)
