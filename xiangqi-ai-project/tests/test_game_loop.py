@@ -169,5 +169,51 @@ class TestGameLoop(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.select_move(GameState())
 
+
+class TestHeadlessGameLoopWeek2(unittest.TestCase):
+    def test_run_headless_game_alias_does_not_need_ui(self):
+        from game.game_loop import run_headless_game
+
+        result = run_headless_game(
+            RandomAgent(player_id=Color.RED, rng=random.Random(21)),
+            RandomAgent(player_id=Color.BLACK, rng=random.Random(22)),
+            max_turns=3,
+        )
+
+        self.assertEqual(result.reason, "max_turns_reached")
+        self.assertEqual(len(result.history), 3)
+
+    def test_step_api_advances_one_hidden_turn(self):
+        loop = GameLoop(
+            red_agent=ScriptedAgent(player_id=Color.RED, moves=[Move((6, 0), (5, 0))], name="RedScript"),
+            black_agent=ScriptedAgent(player_id=Color.BLACK, moves=[Move((3, 0), (4, 0))], name="BlackScript"),
+            max_turns=2,
+        )
+
+        first_result = loop.step()
+        self.assertIsNone(first_result)
+        self.assertEqual(loop.ply_count, 1)
+        self.assertEqual(loop.state.side_to_move, Color.BLACK)
+
+        final_result = loop.step()
+        self.assertIsNotNone(final_result)
+        self.assertEqual(final_result.reason, "max_turns_reached")
+        self.assertEqual(len(final_result.history), 2)
+
+    def test_game_loop_backend_has_no_pygame_dependency(self):
+        import game.game_loop as backend_loop
+
+        self.assertFalse(hasattr(backend_loop, "pygame"))
+
+    def test_headless_ml_vs_random_short_match(self):
+        from evaluation.headless_match import run_ml_vs_random
+
+        records = run_ml_vs_random(games=1, max_turns=1, seed=99)
+
+        self.assertEqual(len(records), 1)
+        self.assertTrue(all(record.red_agent == "MLAgent" for record in records))
+        self.assertTrue(all(record.black_agent == "RandomAgent" for record in records))
+        self.assertTrue(all(record.plies == 1 for record in records))
+
 if __name__ == "__main__":
     unittest.main()
