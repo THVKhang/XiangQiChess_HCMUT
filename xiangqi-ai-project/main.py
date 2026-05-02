@@ -1,4 +1,5 @@
 import sys
+import threading
 import pygame
 
 from agents.ml_agent import MLAgent
@@ -86,6 +87,17 @@ def _rebuild_position_counts(state: GameState):
 def _format_moves_for_ui(state: GameState) -> list[str]:
     return [f"{m.src} → {m.dst}" for m in state.move_history]
 
+def _start_ai_worker(agent, state_snapshot, request_id, result_store):
+    """Run AI search in background and store result with request id."""
+    try:
+        move = agent.select_move(state_snapshot)
+        result_store["move"] = move
+        result_store["error"] = None
+    except Exception as exc:
+        result_store["move"] = None
+        result_store["error"] = str(exc)
+    result_store["request_id"] = request_id
+
 
 def main():
     pygame.init()
@@ -94,6 +106,12 @@ def main():
     width, height = WINDOW_WIDTH, WINDOW_HEIGHT
     screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
     clock = pygame.time.Clock()
+
+    ai_thread = None
+    ai_move_result = {"move": None, "error": None, "request_id": 0}
+    ai_thinking = False
+    ai_agent = None
+    ai_request_id = 0
 
     menu = Menu(WINDOW_WIDTH, WINDOW_HEIGHT)
     game_ui = GameUI(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -142,6 +160,26 @@ def main():
         if app_state == "game":
             game_ui.set_human_input_enabled(human_turn)
 
+        # Check if AI thread finished and ignore stale results.
+        if app_state == "game" and not human_turn and ai_thinking and ai_thread is not None:
+            if not ai_thread.is_alive():
+                ai_thinking = False
+                ai_thread = None
+                if ai_move_result["request_id"] != ai_request_id:
+                    pass
+                elif ai_move_result["error"] is not None:
+                    game_ui.status_message = f"AI move error: {ai_move_result['error']}"
+                elif ai_move_result["move"] is None:
+                    game_ui.status_message = f"{ai_agent.name}: no legal move"
+                else:
+                    try:
+                        assert_legal_move(state, ai_move_result["move"])
+                        state.apply_move(ai_move_result["move"])
+                        game_ui.last_move = (ai_move_result["move"].src, ai_move_result["move"].dst)
+                        game_ui.status_message = f"{ai_agent.name} moved: {ai_move_result['move'].src} -> {ai_move_result['move'].dst}"
+                    except Exception as exc:
+                        game_ui.status_message = f"AI move error: {exc}"
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -186,6 +224,9 @@ def main():
                 action = game_ui.handle_event(event)
                 if action == "back_to_menu":
                     app_state = "menu"
+                    ai_request_id += 1
+                    ai_thinking = False
+                    ai_thread = None
                 elif action == "toggle_fullscreen":
                     fullscreen = not fullscreen
                     if fullscreen:
@@ -208,6 +249,9 @@ def main():
                         processed_plies = len(state.move_history)
                         position_counts = _rebuild_position_counts(state)
                         game_over_reason = None
+                        ai_request_id += 1
+                        ai_thinking = False
+                        ai_thread = None
                 elif action == "new_game":
                     state.reset()
                     undo_stack.clear()
@@ -220,6 +264,9 @@ def main():
                     processed_plies = 0
                     position_counts = {_position_key(state): 1}
                     game_over_reason = None
+                    ai_request_id += 1
+                    ai_thinking = False
+                    ai_thread = None
                 elif action == "save_game" or (
                     event.type == pygame.KEYDOWN and event.key == pygame.K_s
                 ):
@@ -284,21 +331,23 @@ def main():
             elif not human_turn:
                 game_ui.set_game_over_message(None)
                 ai_elapsed_ms += dt
-                if ai_elapsed_ms >= ai_cooldown_ms:
+                if ai_thinking:
+                    game_ui.status_message = "AI is thinking..."
+                if ai_elapsed_ms >= ai_cooldown_ms and not ai_thinking and ai_thread is None and terminal is None and game_over_reason is None:
                     ai_elapsed_ms = 0
-                    agent = red_agent if state.side_to_move == Color.RED else black_agent
-                    if agent is not None:
-                        ai_move = agent.select_move(state.clone())
-                        if ai_move is None:
-                            game_ui.status_message = f"{agent.name}: no legal move"
-                        else:
-                            try:
-                                assert_legal_move(state, ai_move)
-                                state.apply_move(ai_move)
-                                game_ui.last_move = (ai_move.src, ai_move.dst)
-                                game_ui.status_message = f"{agent.name} moved: {ai_move.src} -> {ai_move.dst}"
-                            except Exception as exc:
-                                game_ui.status_message = f"AI move error: {exc}"
+                    ai_agent = red_agent if state.side_to_move == Color.RED else black_agent
+                    ai_request_id += 1
+                    ai_move_result["move"] = None
+                    ai_move_result["error"] = None
+                    ai_move_result["request_id"] = 0
+                    ai_state_snapshot = state.clone()
+                    ai_thread = threading.Thread(
+                        target=_start_ai_worker,
+                        args=(ai_agent, ai_state_snapshot, ai_request_id, ai_move_result),
+                        daemon=True,
+                    )
+                    ai_thread.start()
+                    ai_thinking = True
             else:
                 game_ui.set_game_over_message(None)
                 ai_elapsed_ms = 0
