@@ -8,14 +8,19 @@ from pathlib import Path
 from typing import Any, Optional, Protocol, Sequence
 
 from agents.base_agent import BaseAgent
+from agents.search_agent import BACKTRACK_PENALTY, is_simple_backtrack
 from core.encoding import state_to_tensor
 from core.move import Move
-from core.move_generator import is_legal_move, legal_moves
+from core.move_generator import is_legal_move, legal_moves, result_if_terminal
+from core.policy_encoding import (
+    BOARD_SQUARES as BOARD_SIZE,
+    POLICY_FLAT_LEN as POLICY_SIZE,
+    canonical_move_to_policy_index,
+    move_to_policy_index,
+)
 from core.rules import BOARD_COLS, BOARD_ROWS, Color
 from core.state import GameState
-
-BOARD_SIZE = BOARD_ROWS * BOARD_COLS
-POLICY_SIZE = BOARD_SIZE * BOARD_SIZE
+from game.repetition import cumulative_position_visit_counts, game_loop_position_key
 
 
 class PolicyForwardModel(Protocol):
@@ -40,35 +45,6 @@ class MoveScoringModel(Protocol):
 
     def score_moves(self, state_tensor: Any, legal_move_list: Sequence[Move]) -> Sequence[float]:
         ...
-
-
-def _square_index(pos: tuple[int, int]) -> int:
-    return pos[0] * BOARD_COLS + pos[1]
-
-
-def move_to_policy_index(move: Move) -> int:
-    """Map an actual board move to a flat 90x90 policy index."""
-    return _square_index(move.src) * BOARD_SIZE + _square_index(move.dst)
-
-
-def _to_canonical_pos(pos: tuple[int, int], side_to_move: Color) -> tuple[int, int]:
-    """Match ``state_to_tensor(..., canonical=True)`` coordinate convention."""
-    if side_to_move == Color.BLACK:
-        return BOARD_ROWS - 1 - pos[0], BOARD_COLS - 1 - pos[1]
-    return pos
-
-
-def canonical_move_to_policy_index(move: Move, side_to_move: Color) -> int:
-    """Map an actual move to the policy index used by the canonical tensor.
-
-    With canonical encoding, BLACK-to-move states are rotated by 180 degrees and
-    colors are swapped, so the model always sees the current player as RED.
-    Legal moves from the real board must be transformed the same way before the
-    policy score is read.
-    """
-    src = _to_canonical_pos(move.src, side_to_move)
-    dst = _to_canonical_pos(move.dst, side_to_move)
-    return _square_index(src) * BOARD_SIZE + _square_index(dst)
 
 
 @dataclass(slots=True)
@@ -201,7 +177,8 @@ class MLAgent(BaseAgent):
     2. encodes the board into a canonical tensor;
     3. runs model forward pass to get policy scores;
     4. reads the scores of legal moves only;
-    5. returns the highest-scoring legal move.
+    5. applies luật phụ cho lặp vị trí / quay lui (tránh góc kẹt lặp nước);
+    6. returns the highest-scoring legal move.
     """
 
     def __init__(
@@ -212,12 +189,19 @@ class MLAgent(BaseAgent):
         name: str = "MLAgent",
         device: str = "cpu",
         rng: Optional[random.Random] = None,
+        *,
+        apply_repetition_heuristics: bool = True,
+        threefold_imminent_penalty: float = 500_000.0,
+        backtrack_penalty: float = BACKTRACK_PENALTY,
     ) -> None:
         super().__init__(player_id=player_id, name=name)
         self.device = device
         self.rng = rng if rng is not None else random.Random(0)
         self.model_path = Path(model_path) if model_path else None
         self.model = model if model is not None else self._load_model(self.model_path, device)
+        self.apply_repetition_heuristics = apply_repetition_heuristics
+        self.threefold_imminent_penalty = threefold_imminent_penalty
+        self.backtrack_penalty = backtrack_penalty
 
     def _load_model(self, model_path: Path | None, device: str) -> PolicyForwardModel | MoveScoringModel:
         if model_path is None:
@@ -292,6 +276,24 @@ class MLAgent(BaseAgent):
         # Safe fallback: never crash GameLoop because of a bad model output.
         return [0.0] * len(moves)
 
+    def _adjust_scores_for_repetition_rules(
+        self, state: GameState, moves: Sequence[Move], scores: list[float]
+    ) -> list[float]:
+        """Giảm điểm các nước dễ gây lặp vị trí (threefold) hoặc lặp qua lại ngay (backtrack)."""
+        if not self.apply_repetition_heuristics:
+            return scores
+        visit_counts = cumulative_position_visit_counts(state)
+        adjusted = list(scores)
+        for i, mv in enumerate(moves):
+            if is_simple_backtrack(state, mv):
+                adjusted[i] -= self.backtrack_penalty
+            trial = state.clone()
+            trial.apply_move(mv)
+            new_key = game_loop_position_key(trial)
+            if visit_counts.get(new_key, 0) + 1 >= 3:
+                adjusted[i] -= self.threefold_imminent_penalty
+        return adjusted
+
     def get_legal_move_scores(self, state: GameState) -> list[tuple[Move, float]]:
         """Debug/evaluation helper: expose the legal moves after model forward pass."""
         if state.side_to_move != self.player_id:
@@ -299,11 +301,15 @@ class MLAgent(BaseAgent):
                 f"{self.name} was asked to evaluate {state.side_to_move.value}, "
                 f"but it was initialized for {self.player_id.value}."
             )
+        # Match GameLoop: never run policy on finished positions (checkmate/stalemate/capture).
+        if result_if_terminal(state) is not None:
+            return []
         moves = self._filtered_legal_moves(state)
         if not moves:
             return []
         state_tensor = state_to_tensor(state, channels_first=True, canonical=True, as_numpy=False)
         scores = self._score_legal_moves(state, state_tensor, moves)
+        scores = self._adjust_scores_for_repetition_rules(state, moves, scores)
         return list(zip(moves, scores))
 
     def select_move(self, state: GameState) -> Optional[Move]:

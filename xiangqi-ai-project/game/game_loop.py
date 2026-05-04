@@ -7,6 +7,7 @@ from core.move import Move
 from core.move_generator import assert_legal_move, get_winner, is_terminal, result_if_terminal
 from core.rules import Color
 from core.state import GameState
+from game.repetition import game_loop_position_key
 
 
 class AgentLike(Protocol):
@@ -73,7 +74,7 @@ class GameLoop:
         self.history: list[TurnRecord] = []
         self._position_counts: dict[
             tuple[str, tuple[tuple[tuple[int, int], str, str], ...]], int
-        ] = {self._position_key(): 1}
+        ] = {game_loop_position_key(self.state): 1}
         self._finished_result: Optional[GameLoopResult] = None
 
     @property
@@ -84,13 +85,7 @@ class GameLoop:
         return self.red_agent if self.state.side_to_move == Color.RED else self.black_agent
 
     def _position_key(self) -> tuple[str, tuple[tuple[tuple[int, int], str, str], ...]]:
-        pieces: list[tuple[tuple[int, int], str, str]] = []
-        for pos, piece in self.state.board.squares():
-            if piece is None:
-                continue
-            pieces.append((pos, piece.color.value, piece.kind.value))
-        pieces.sort()
-        return self.state.side_to_move.value, tuple(pieces)
+        return game_loop_position_key(self.state)
 
     def _build_result(self, winner: Optional[Color], reason: str) -> GameLoopResult:
         result = GameLoopResult(
