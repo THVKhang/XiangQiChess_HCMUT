@@ -161,7 +161,18 @@ class TorchPolicyAdapter:
 
     def forward(self, state_tensor: Any) -> Any:
         torch = self._torch
-        x = torch.tensor(state_tensor, dtype=torch.float32, device=self.device).unsqueeze(0)
+        if hasattr(state_tensor, "__array__"):
+            try:
+                import numpy as np  # type: ignore
+            except Exception:
+                np = None  # pragma: no cover
+            if np is not None and isinstance(state_tensor, np.ndarray):
+                x = torch.from_numpy(state_tensor.astype("float32", copy=False)).to(self.device)
+            else:
+                x = torch.tensor(state_tensor, dtype=torch.float32, device=self.device)
+        else:
+            x = torch.tensor(state_tensor, dtype=torch.float32, device=self.device)
+        x = x.unsqueeze(0)
         with torch.no_grad():
             output = self.model(x)
         if isinstance(output, (tuple, list)):
@@ -247,6 +258,10 @@ class MLAgent(BaseAgent):
 
         return _walk(raw_output)
 
+    def _prepare_state_tensor(self, state: GameState) -> Any:
+        """Encode state into a consistent channels-first NumPy tensor for model inference."""
+        return state_to_tensor(state, channels_first=True, canonical=True, as_numpy=True)
+
     def _forward_policy_scores(self, state_tensor: Any) -> list[float]:
         if hasattr(self.model, "forward"):
             return self._flatten_scores(self.model.forward(state_tensor))  # type: ignore[attr-defined]
@@ -307,7 +322,7 @@ class MLAgent(BaseAgent):
         moves = self._filtered_legal_moves(state)
         if not moves:
             return []
-        state_tensor = state_to_tensor(state, channels_first=True, canonical=True, as_numpy=False)
+        state_tensor = self._prepare_state_tensor(state)
         scores = self._score_legal_moves(state, state_tensor, moves)
         scores = self._adjust_scores_for_repetition_rules(state, moves, scores)
         return list(zip(moves, scores))
