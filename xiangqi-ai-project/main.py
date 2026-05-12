@@ -1,3 +1,4 @@
+import os
 import sys
 import pygame
 
@@ -15,6 +16,8 @@ from ui.menu import Menu
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 760
 FPS = 67
+
+DEBUG_STATE = os.getenv("XIANGQI_DEBUG_STATE", "0").lower() in {"1", "true", "yes", "on"}
 
 
 def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
@@ -212,6 +215,8 @@ def main():
                     ai_elapsed_ms = 0
                     agent = red_agent if state.side_to_move == Color.RED else black_agent
                     if agent is not None:
+                        if DEBUG_STATE:
+                            state.validate()
                         ai_move = agent.select_move(state.clone())
                         if ai_move is None:
                             game_ui.status_message = f"{agent.name}: no legal move"
@@ -219,6 +224,8 @@ def main():
                             try:
                                 assert_legal_move(state, ai_move)
                                 state.apply_move(ai_move)
+                                if DEBUG_STATE:
+                                    state.validate()
                                 game_ui.last_move = (ai_move.src, ai_move.dst)
                                 game_ui.status_message = f"{agent.name} moved: {ai_move.src} -> {ai_move.dst}"
                             except Exception as exc:

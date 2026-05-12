@@ -9,7 +9,6 @@ from typing import Any, Optional, Protocol, Sequence
 
 from agents.base_agent import BaseAgent
 from agents.search_agent import BACKTRACK_PENALTY, is_simple_backtrack
-from core.encoding import state_to_tensor
 from core.move import Move
 from core.move_generator import is_legal_move, legal_moves, result_if_terminal
 from core.policy_encoding import (
@@ -260,7 +259,7 @@ class MLAgent(BaseAgent):
 
     def _prepare_state_tensor(self, state: GameState) -> Any:
         """Encode state into a consistent channels-first NumPy tensor for model inference."""
-        return state_to_tensor(state, channels_first=True, canonical=True, as_numpy=True)
+        return state.to_tensor(channels_first=True, canonical=True, as_numpy=True)
 
     def _forward_policy_scores(self, state_tensor: Any) -> list[float]:
         if hasattr(self.model, "forward"):
@@ -302,11 +301,13 @@ class MLAgent(BaseAgent):
         for i, mv in enumerate(moves):
             if is_simple_backtrack(state, mv):
                 adjusted[i] -= self.backtrack_penalty
-            trial = state.clone()
-            trial.apply_move(mv)
-            new_key = game_loop_position_key(trial)
-            if visit_counts.get(new_key, 0) + 1 >= 3:
-                adjusted[i] -= self.threefold_imminent_penalty
+            undo = state.apply_move(mv)
+            try:
+                new_key = game_loop_position_key(state)
+                if visit_counts.get(new_key, 0) + 1 >= 3:
+                    adjusted[i] -= self.threefold_imminent_penalty
+            finally:
+                state.undo_move(undo)
         return adjusted
 
     def get_legal_move_scores(self, state: GameState) -> list[tuple[Move, float]]:

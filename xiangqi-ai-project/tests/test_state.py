@@ -39,6 +39,17 @@ class TestGameState(unittest.TestCase):
         self.assertIsNotNone(self.state.board.get((9, 4)))
         self.assertIsNone(cloned_state.board.get((9, 4)))
 
+    def test_validate_state(self):
+        self.state.validate()
+        move = Move(src=(6, 0), dst=(5, 0))
+        self.state.apply_move(move)
+        self.state.validate()
+
+    def test_validate_raises_on_corrupted_board(self):
+        self.state.board.grid[0][0] = "invalid"
+        with self.assertRaises(TypeError):
+            self.state.validate()
+
     def test_game_over_checkmate(self):
         self.state.board = Board.empty()
         self.state.board.set((9, 4), Piece(Color.RED, PieceType.GENERAL))
