@@ -13,6 +13,7 @@ if __package__ is None or __package__ == "":
 
 from agents.ml_agent import MLAgent
 from agents.random_agent import RandomAgent
+from agents.search_agent import EasyAgent, MediumAgent, HardAgent
 from core.rules import Color
 from game.game_loop import run_headless_game
 
@@ -28,12 +29,53 @@ class HeadlessMatchRecord:
     elapsed_ms: int
 
 
-def run_ml_vs_random(games: int = 10, max_turns: int = 160, seed: int = 2026) -> list[HeadlessMatchRecord]:
+def run_ml_vs_random(
+    games: int = 10,
+    max_turns: int = 160,
+    seed: int = 2026,
+    ml_level: str = "Hard",
+) -> list[HeadlessMatchRecord]:
     """Run MLAgent vs RandomAgent fully hidden, without importing/starting UI."""
     records: list[HeadlessMatchRecord] = []
     for idx in range(1, games + 1):
-        red_agent = MLAgent(player_id=Color.RED)
+        red_agent = MLAgent(player_id=Color.RED, level=ml_level)
         black_agent = RandomAgent(player_id=Color.BLACK, rng=random.Random(seed + idx))
+
+        start = time.perf_counter()
+        result = run_headless_game(red_agent, black_agent, max_turns=max_turns)
+        elapsed_ms = int((time.perf_counter() - start) * 1000)
+
+        records.append(
+            HeadlessMatchRecord(
+                game_index=idx,
+                red_agent=red_agent.name,
+                black_agent=black_agent.name,
+                winner="draw" if result.winner is None else result.winner.value,
+                reason=result.reason,
+                plies=len(result.history),
+                elapsed_ms=elapsed_ms,
+            )
+        )
+    return records
+
+
+_SEARCH_LEVEL_MAP = {"Easy": EasyAgent, "Medium": MediumAgent, "Hard": HardAgent}
+
+
+def run_ml_vs_search(
+    games: int = 10,
+    max_turns: int = 160,
+    seed: int = 2026,
+    ml_level: str = "Hard",
+    search_level: str = "Easy",
+    search_algorithm: str = "minimax",
+) -> list[HeadlessMatchRecord]:
+    """Run MLAgent (Red) vs Search/Minimax agent (Black) fully hidden."""
+    search_cls = _SEARCH_LEVEL_MAP.get(search_level, EasyAgent)
+    records: list[HeadlessMatchRecord] = []
+    for idx in range(1, games + 1):
+        red_agent = MLAgent(player_id=Color.RED, level=ml_level)
+        black_agent = search_cls(player_id=Color.BLACK, algorithm=search_algorithm)
 
         start = time.perf_counter()
         result = run_headless_game(red_agent, black_agent, max_turns=max_turns)
@@ -69,14 +111,34 @@ def print_summary(records: list[HeadlessMatchRecord]) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run hidden/headless MLAgent vs RandomAgent matches.")
+    parser = argparse.ArgumentParser(description="Run hidden/headless matches (ML vs Random or ML vs Search).")
+    parser.add_argument("--mode", choices=["ml-vs-random", "ml-vs-search"], default="ml-vs-random")
     parser.add_argument("--games", type=int, default=10)
     parser.add_argument("--max-turns", type=int, default=160)
     parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument("--ml-level", choices=["Easy", "Medium", "Hard"], default="Hard")
+    parser.add_argument("--search-level", choices=["Easy", "Medium", "Hard"], default="Easy")
+    parser.add_argument("--search-algorithm", choices=["minimax", "alphabeta"], default="minimax")
     parser.add_argument("--json-out", type=Path, default=None)
     args = parser.parse_args()
 
-    records = run_ml_vs_random(games=args.games, max_turns=args.max_turns, seed=args.seed)
+    if args.mode == "ml-vs-search":
+        records = run_ml_vs_search(
+            games=args.games,
+            max_turns=args.max_turns,
+            seed=args.seed,
+            ml_level=args.ml_level,
+            search_level=args.search_level,
+            search_algorithm=args.search_algorithm,
+        )
+    else:
+        records = run_ml_vs_random(
+            games=args.games,
+            max_turns=args.max_turns,
+            seed=args.seed,
+            ml_level=args.ml_level,
+        )
+
     print_summary(records)
 
     if args.json_out is not None:

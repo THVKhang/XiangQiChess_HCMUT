@@ -1,0 +1,493 @@
+% ============================================================
+%  USAGE: paste this file's content into your group report
+%  between other sections, OR compile standalone with:
+%      xelatex report_integration_and_levels.tex
+%
+%  If compiling standalone, keep the preamble below.
+%  If pasting into a group report, remove everything above
+%  and including \begin{document}, and remove \end{document}.
+% ============================================================
+\documentclass[12pt,a4paper]{article}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont[Scale=0.88]{Courier New}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{fancyhdr}
+\setlength{\headheight}{15pt}
+
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.0,0.3,0.7}
+\definecolor{codeorange}{rgb}{0.7,0.4,0.0}
+\definecolor{codebg}{rgb}{0.97,0.97,0.97}
+
+\lstdefinestyle{pycode}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codeblue}\bfseries,
+  commentstyle=\color{codegray}\itshape,
+  stringstyle=\color{codeorange},
+  backgroundcolor=\color{codebg},
+  numbers=left, numberstyle=\tiny\color{codegray},
+  breaklines=true, frame=single, framesep=4pt,
+  xleftmargin=1.8em, tabsize=4, showstringspaces=false,
+  captionpos=b,
+}
+\lstset{style=pycode}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small XiangQi Chess HCMUT --- Project Report}
+\rhead{\small Model Integration and Agent Difficulty Levels}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\hypersetup{colorlinks=true, linkcolor=blue!60!black}
+
+\begin{document}
+
+% ============================================================
+% NOTE TO GROUP: replace the section number below to match
+% your report structure, e.g. \section{...} or \subsection{...}
+% ============================================================
+
+\section{Policy Model Integration and Agent Difficulty Levels}
+\label{sec:integration}
+
+This section describes the design and implementation of two closely
+related contributions: (1) integrating the policy-based ML model into
+the existing \texttt{GameLoop} so that all game modes share the same
+backend pipeline, and (2) defining a three-level difficulty system for
+the ML agent and exposing it through the user interface.
+
+% ============================================================
+\subsection{Background and Design Goals}
+\label{sec:integration-background}
+
+Before this milestone, the project had a functional rule engine,
+a headless \texttt{GameLoop}, and an \texttt{MLAgent} stub that used a
+dummy heuristic model.  The following items were not yet implemented:
+
+\begin{itemize}
+  \item Named difficulty levels for the ML agent.
+  \item Game modes that involve the ML agent in the UI (Human vs ML,
+        ML vs Random, ML vs Search).
+  \item A level-selection panel for the ML agent in the Pygame menu.
+  \item A headless evaluation harness for ML vs Minimax / AlphaBeta.
+\end{itemize}
+
+The guiding design principle throughout is \textbf{single source of
+truth}: the same \texttt{GameLoop}, the same \texttt{legal\_moves}
+function, and the same \texttt{assert\_legal\_move} guard are reused
+for every mode — headless or UI, search agent or ML agent.
+
+% ============================================================
+\subsection{GameLoop: Headless Architecture}
+\label{sec:gameloop}
+
+\texttt{game/game\_loop.py} is the single backend turn engine with no
+Pygame dependency.  Its public interface is:
+
+\begin{lstlisting}[caption={GameLoop public API}]
+# One complete hidden match
+result = run_headless_game(red_agent, black_agent, max_turns=200)
+
+# Step-by-step (used by the Pygame main loop)
+loop = GameLoop(red_agent, black_agent, max_turns=200)
+result = loop.step()   # returns None while match continues
+\end{lstlisting}
+
+For each turn \texttt{step()} performs the following operations in order:
+
+\begin{enumerate}
+  \item Check terminal state (\texttt{result\_if\_terminal}).
+  \item Check \texttt{ply\_count >= max\_turns}.
+  \item Select the current agent by \texttt{state.side\_to\_move}.
+  \item Call \texttt{agent.select\_move(state.clone())} --- a clone is
+        passed so model inference cannot mutate the authoritative board.
+  \item Validate the returned move with \texttt{assert\_legal\_move}.
+  \item Apply the move and update the threefold-repetition counter.
+  \item Return \texttt{None} (continue) or a \texttt{GameLoopResult}
+        with \texttt{winner}, \texttt{reason}, and full \texttt{history}.
+\end{enumerate}
+
+The Pygame main loop in \texttt{main.py} reuses the same
+\texttt{assert\_legal\_move} call and \texttt{state.clone()} pattern
+for consistency with the headless path.
+
+% ============================================================
+\subsection{ML Agent: Inference Pipeline}
+\label{sec:inference}
+
+\texttt{MLAgent} implements the same \texttt{BaseAgent} interface
+(\texttt{select\_move(state) -> Optional[Move]}) as every other agent.
+On each call it executes five steps:
+
+\begin{enumerate}
+  \item \textbf{Filter legal moves.}
+        \texttt{legal\_moves(state)} is called and each move is
+        re-validated by \texttt{is\_legal\_move} as a defensive check.
+  \item \textbf{Encode the board.}
+        \texttt{state.to\_tensor(canonical=True)} produces a
+        $(15, 10, 9)$ array.  Channels~0--6 are the seven piece types
+        for the current player; channels~7--13 for the opponent;
+        channel~14 is the side-to-move flag.  When the current player
+        is BLACK the board is rotated $180^\circ$ and colors are swapped
+        so the model always sees the board from the same perspective.
+  \item \textbf{Forward pass.}
+        \texttt{model.forward(state\_tensor)} returns an 8\,100-length
+        policy vector.  The policy index for a move is:
+        \begin{equation}
+          \text{index}(src, dst)
+          = \bigl(r_{src} \times 9 + c_{src}\bigr) \times 90
+          + \bigl(r_{dst} \times 9 + c_{dst}\bigr).
+          \label{eq:policy}
+        \end{equation}
+  \item \textbf{Map scores to legal moves.}
+        \texttt{canonical\_move\_to\_policy\_index(mv, side\_to\_move)}
+        applies the coordinate flip for BLACK moves before reading each
+        legal move's score from the policy vector.
+  \item \textbf{Select the best move.}
+        The legal move with the highest score is returned (argmax), with
+        an optional epsilon-greedy override for the Easy level
+        (Section~\ref{sec:levels}).
+\end{enumerate}
+
+\subsubsection{Model Loading}
+
+\texttt{MLAgent.\_load\_model} resolves the model source at construction
+time (Table~\ref{tab:model-sources}).
+
+\begin{table}[H]
+\centering
+\caption{Supported model sources for \texttt{MLAgent}.}
+\label{tab:model-sources}
+\begin{tabular}{lll}
+\toprule
+\textbf{\texttt{model\_path}} & \textbf{Loader} & \textbf{Notes} \\
+\midrule
+\texttt{None} & \texttt{DummyPolicyModel()} &
+  Heuristic placeholder; 8\,100-dim output \\
+\texttt{*.json} & \texttt{DummyPolicyModel(**cfg)} &
+  JSON-configurable dummy weights \\
+\texttt{*.pt} / \texttt{*.pth} & \texttt{TorchPolicyAdapter} &
+  Trained PyTorch checkpoint \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\texttt{TorchPolicyAdapter} wraps inference in \texttt{torch.no\_grad()},
+adds the batch dimension, and returns a plain Python list so the rest of
+\texttt{MLAgent} is framework-agnostic.
+
+\subsubsection{DummyPolicyModel}
+
+Before a trained checkpoint is available, \texttt{DummyPolicyModel}
+exercises the full inference path by computing a heuristic 8\,100-dim
+policy vector from the encoded tensor.  For each source--destination
+pair the score is:
+
+\begin{equation}
+  s(src, dst) =
+  V_{\text{piece}}(src)
+  + B_{\text{cap}} \cdot \mathbf{1}[\text{enemy at }dst]
+  - \lambda_c \cdot d_{\text{center}}(dst)
+  + \lambda_f \cdot \Delta r_{\text{fwd}}
+  \label{eq:dummy}
+\end{equation}
+
+with $B_{\text{cap}} = 100$, $\lambda_c = 1.0$, $\lambda_f = 0.25$.
+Pairs that have no own piece at the source, or that land on a friendly
+piece, receive score $-10^6$ and are never selected.
+
+The critical property is that the output shape (8\,100) and coordinate
+convention (canonical) are identical to a trained model's output, so
+replacing \texttt{DummyPolicyModel} with a trained \texttt{.pth}
+checkpoint requires only passing a different \texttt{model\_path} to
+\texttt{MLAgent} --- no other code changes.
+
+\subsubsection{Repetition Heuristics}
+
+When the \textit{Hard} level is active, scores of moves that could
+cause threefold repetition or simple backtracking are penalized after
+the forward pass:
+
+\begin{lstlisting}[caption={Repetition penalty applied after forward pass}]
+for i, mv in enumerate(moves):
+    if is_simple_backtrack(state, mv):
+        scores[i] -= BACKTRACK_PENALTY        # 1500 pts
+
+    undo = state.apply_move(mv)
+    try:
+        key = game_loop_position_key(state)
+        if visit_counts.get(key, 0) + 1 >= 3:
+            scores[i] -= THREEFOLD_PENALTY    # 500 000 pts
+    finally:
+        state.undo_move(undo)
+\end{lstlisting}
+
+\texttt{is\_simple\_backtrack} fires when the agent's own previous move
+is exactly reversed in the current candidate.  The threefold penalty is
+large enough to override all policy scores.
+
+% ============================================================
+\subsection{Difficulty-Level System}
+\label{sec:levels}
+
+\subsubsection{Motivation}
+
+A single set of parameters does not produce a useful spread of
+playing strength.  Three difficulty levels are defined to: (1)~let
+beginners play against a weak opponent, (2)~provide a fair baseline
+for comparison with the search-based agents, and (3)~give a strongest
+configuration for benchmarking.
+
+\subsubsection{Level Definitions}
+
+The levels are declared in the module-level dictionary
+\texttt{ML\_AGENT\_LEVELS}:
+
+\begin{lstlisting}[caption={ML agent level configuration}]
+ML_AGENT_LEVELS = {
+    "Easy":   {"epsilon": 0.4,  "apply_repetition_heuristics": False},
+    "Medium": {"epsilon": 0.0,  "apply_repetition_heuristics": False},
+    "Hard":   {"epsilon": 0.0,  "apply_repetition_heuristics": True},
+}
+\end{lstlisting}
+
+Table~\ref{tab:levels} summarises the effect of each level.
+
+\begin{table}[H]
+\centering
+\caption{ML agent difficulty levels and their behavioral parameters.}
+\label{tab:levels}
+\begin{tabular}{lccl}
+\toprule
+\textbf{Level} & \textbf{$\varepsilon$} &
+\textbf{Rep.\ heuristics} & \textbf{Behavioral description} \\
+\midrule
+Easy   & 0.40 & Off &
+  40\% of moves are chosen uniformly at random; \\
+  & & & 60\% follow the policy argmax.
+  Weak and unpredictable. \\[3pt]
+Medium & 0.00 & Off &
+  Pure policy argmax.  Can loop when \\
+  & & & no capture is available (no anti-repetition). \\[3pt]
+Hard   & 0.00 & On  &
+  Policy argmax with heavy penalties \\
+  & & & for repetition and backtracking. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Epsilon-Greedy Selection (Easy Level)}
+
+With probability $\varepsilon$ the agent samples a legal move uniformly
+at random rather than following the policy.  The random branch is
+seeded via a \texttt{random.Random} instance for reproducibility.
+
+\begin{lstlisting}[caption={Epsilon-greedy branch in \texttt{select\_move}}]
+if self.epsilon > 0.0 and self.rng.random() < self.epsilon:
+    return self.rng.choice([mv for mv, _ in move_scores])
+
+# Normal path: argmax
+best_move, _ = max(move_scores, key=lambda item: item[1])
+return best_move
+\end{lstlisting}
+
+\subsubsection{Agent Construction}
+
+The level is specified at construction time:
+
+\begin{lstlisting}[caption={Constructing \texttt{MLAgent} at a chosen level}]
+from agents.ml_agent import MLAgent
+from core.rules import Color
+
+agent = MLAgent(player_id=Color.RED, level="Hard")
+# Resolved attributes:
+# agent.name    -> "MLAgent(Hard)"
+# agent.epsilon -> 0.0
+# agent.apply_repetition_heuristics -> True
+\end{lstlisting}
+
+Individual parameters (\texttt{epsilon},
+\texttt{apply\_repetition\_heuristics}) can still be overridden
+explicitly for ablation experiments, independent of the named level.
+
+% ============================================================
+\subsection{New Game Modes}
+\label{sec:modes}
+
+Three new game modes were added to the menu and backend
+(Table~\ref{tab:modes}), alongside the three original modes.
+
+\begin{table}[H]
+\centering
+\caption{All six supported game modes after this milestone.}
+\label{tab:modes}
+\begin{tabular}{lll}
+\toprule
+\textbf{Mode} & \textbf{Red side} & \textbf{Black side} \\
+\midrule
+Human vs AI    & Human input        & SearchAgent (AI level) \\
+AI vs AI       & SearchAgent (Red)  & SearchAgent (Black) \\
+AI vs Random   & SearchAgent        & RandomAgent \\
+Human vs ML    & Human input        & MLAgent (ML level) \textbf{[new]} \\
+ML vs Random   & MLAgent (ML level) & RandomAgent        \textbf{[new]} \\
+ML vs Search   & MLAgent (ML level) & SearchAgent (AI level) \textbf{[new]} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In \texttt{main.py}, all modes are handled in a single dispatch function:
+
+\begin{lstlisting}[caption={\texttt{\_build\_agents} dispatch (new branches)}]
+def _build_agents(mode, level, red_level=None,
+                  black_level=None, ml_level="Hard"):
+    if mode == "Human vs ML":
+        return Color.RED, None,
+               _build_ml_agent(Color.BLACK, ml_level)
+    if mode == "ML vs Random":
+        return None,
+               _build_ml_agent(Color.RED, ml_level),
+               RandomAgent(player_id=Color.BLACK)
+    if mode == "ML vs Search":
+        return None,
+               _build_ml_agent(Color.RED, ml_level),
+               _build_search_agent(level, Color.BLACK)
+    # ... original modes unchanged
+\end{lstlisting}
+
+% ============================================================
+\subsection{UI Level Selector}
+\label{sec:ui-level}
+
+The Pygame menu (\texttt{ui/menu.py}) was extended with an
+\textbf{ML Level} panel that appears dynamically depending on the
+selected mode (Table~\ref{tab:panels}).
+
+\begin{table}[H]
+\centering
+\caption{Level panel shown per game mode.}
+\label{tab:panels}
+\begin{tabular}{ll}
+\toprule
+\textbf{Mode} & \textbf{Level panel displayed} \\
+\midrule
+Human vs AI, AI vs Random & Single AI Level selector \\
+Human vs ML, ML vs Random & Single ML Level selector \\
+ML vs Search & Two side-by-side: ML Level + AI Level \\
+AI vs AI & Two columns: Red AI level + Black AI level \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two helper methods on \texttt{Menu} determine which panels to render:
+
+\begin{lstlisting}[caption={Panel selection logic in \texttt{Menu}}]
+def _mode_uses_ai_level(self):
+    return self.selected_mode in (
+        "Human vs AI", "AI vs Random", "ML vs Search")
+
+def _mode_uses_ml_level(self):
+    return self.selected_mode in (
+        "Human vs ML", "ML vs Random", "ML vs Search")
+\end{lstlisting}
+
+The selected ML level is stored in \texttt{menu.selected\_ml\_level}
+and passed to \texttt{\_build\_agents} when the user starts the game:
+
+\begin{lstlisting}[caption={Passing ML level from menu to agent construction}]
+human_color, red_agent, black_agent = _build_agents(
+    menu.selected_mode,
+    menu.selected_level,          # AI (search) level
+    red_level   = menu.selected_red_level,
+    black_level = menu.selected_black_level,
+    ml_level    = menu.selected_ml_level,   # <-- new
+)
+\end{lstlisting}
+
+% ============================================================
+\subsection{Headless Evaluation: ML vs Minimax / AlphaBeta}
+\label{sec:headless-eval}
+
+\texttt{evaluation/headless\_match.py} was extended with a second
+simulation function for batch evaluation of ML against search agents:
+
+\begin{lstlisting}[caption={Headless evaluation API}]
+records = run_ml_vs_search(
+    games=10, max_turns=160,
+    ml_level="Hard",
+    search_level="Easy",          # depth preset for SearchAgent
+    search_algorithm="minimax",   # or "alphabeta"
+)
+\end{lstlisting}
+
+Each record is a \texttt{HeadlessMatchRecord} containing agent names,
+winner, reason (\textit{checkmate}, \textit{stalemate}, etc.),
+ply count, and elapsed time.  Results can be exported to JSON:
+
+\begin{verbatim}
+python evaluation/headless_match.py \
+  --mode ml-vs-search \
+  --games 10 --ml-level Hard \
+  --search-level Easy --search-algorithm minimax \
+  --json-out evaluation/results/ml_vs_minimax.json
+\end{verbatim}
+
+Table~\ref{tab:results} shows representative results from smoke tests.
+
+\begin{table}[H]
+\centering
+\caption{Headless smoke-test results (1 game each, \texttt{max\_turns=60}, seed~42).}
+\label{tab:results}
+\begin{tabular}{llll}
+\toprule
+\textbf{Red (MLAgent level)} & \textbf{Black} &
+\textbf{Outcome} & \textbf{Reason} \\
+\midrule
+Easy   & RandomAgent       & Draw       & max\_turns\_reached \\
+Medium & RandomAgent       & Draw       & stalemate \\
+Hard   & RandomAgent       & Draw       & stalemate \\
+Hard   & Easy Minimax (d=1) & Black wins & checkmate \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dummy policy model losing to depth-1 Minimax is expected: the
+heuristic model is not calibrated for endgame sequences.  Replacing
+\texttt{DummyPolicyModel} with a trained checkpoint requires no changes
+to the evaluation pipeline.
+
+% ============================================================
+\subsection{Safety and Correctness Guarantees}
+\label{sec:safety}
+
+Regardless of model quality, the following invariants are maintained:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{MLAgent only scores legal moves.}
+        The model cannot cause the agent to select an illegal move
+        because its output is only read for moves already validated
+        by \texttt{legal\_moves(state)}.
+  \item \textbf{GameLoop validates every move before applying it.}
+        \texttt{assert\_legal\_move} raises \texttt{ValueError} if an
+        agent returns an illegal move, so a buggy model cannot corrupt
+        game state.
+  \item \textbf{State isolation.}
+        Agents receive \texttt{state.clone()}.
+        Model inference cannot mutate the authoritative board.
+  \item \textbf{Graceful fallback on bad model output.}
+        Wrong output shapes, NaN/Inf values, and forward-pass exceptions
+        all fall back to neutral scores (0.0 per legal move) rather than
+        crashing the game.
+\end{enumerate}
+
+\end{document}

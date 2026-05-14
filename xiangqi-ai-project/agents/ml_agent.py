@@ -179,6 +179,13 @@ class TorchPolicyAdapter:
         return output.detach().flatten().cpu().tolist()
 
 
+ML_AGENT_LEVELS = {
+    "Easy":   {"epsilon": 0.4, "apply_repetition_heuristics": False},
+    "Medium": {"epsilon": 0.0, "apply_repetition_heuristics": False},
+    "Hard":   {"epsilon": 0.0, "apply_repetition_heuristics": True},
+}
+
+
 class MLAgent(BaseAgent):
     """ML-based agent that plugs into the existing GameLoop interface.
 
@@ -189,6 +196,11 @@ class MLAgent(BaseAgent):
     4. reads the scores of legal moves only;
     5. applies luật phụ cho lặp vị trí / quay lui (tránh góc kẹt lặp nước);
     6. returns the highest-scoring legal move.
+
+    ``level`` (Easy/Medium/Hard) controls:
+    - Easy: 40% random exploration, no repetition heuristics
+    - Medium: pure argmax, no repetition heuristics
+    - Hard: argmax + repetition heuristics enabled
     """
 
     def __init__(
@@ -199,17 +211,25 @@ class MLAgent(BaseAgent):
         name: str = "MLAgent",
         device: str = "cpu",
         rng: Optional[random.Random] = None,
+        level: str = "Hard",
         *,
-        apply_repetition_heuristics: bool = True,
+        apply_repetition_heuristics: bool | None = None,
+        epsilon: float | None = None,
         threefold_imminent_penalty: float = 500_000.0,
         backtrack_penalty: float = BACKTRACK_PENALTY,
     ) -> None:
-        super().__init__(player_id=player_id, name=name)
+        level_cfg = ML_AGENT_LEVELS.get(level, ML_AGENT_LEVELS["Hard"])
+        resolved_epsilon = epsilon if epsilon is not None else level_cfg["epsilon"]
+        resolved_rep = apply_repetition_heuristics if apply_repetition_heuristics is not None else level_cfg["apply_repetition_heuristics"]
+        agent_name = name if name != "MLAgent" else f"MLAgent({level})"
+        super().__init__(player_id=player_id, name=agent_name)
+        self.level = level
         self.device = device
         self.rng = rng if rng is not None else random.Random(0)
+        self.epsilon = resolved_epsilon
         self.model_path = Path(model_path) if model_path else None
         self.model = model if model is not None else self._load_model(self.model_path, device)
-        self.apply_repetition_heuristics = apply_repetition_heuristics
+        self.apply_repetition_heuristics = resolved_rep
         self.threefold_imminent_penalty = threefold_imminent_penalty
         self.backtrack_penalty = backtrack_penalty
 
@@ -338,6 +358,10 @@ class MLAgent(BaseAgent):
         move_scores = self.get_legal_move_scores(state)
         if not move_scores:
             return None
+
+        # Epsilon-greedy: Easy level randomly selects a legal move with probability epsilon.
+        if self.epsilon > 0.0 and self.rng.random() < self.epsilon:
+            return self.rng.choice([mv for mv, _ in move_scores])
 
         # Stable argmax. If all scores are equal/invalid, Python keeps the first legal move.
         best_move, _best_score = max(move_scores, key=lambda item: item[1])
