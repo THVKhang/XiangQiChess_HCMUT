@@ -204,6 +204,7 @@ class MLAgent(BaseAgent):
         apply_repetition_heuristics: bool = True,
         threefold_imminent_penalty: float = 500_000.0,
         backtrack_penalty: float = BACKTRACK_PENALTY,
+        difficulty: str = "hard",
     ) -> None:
         super().__init__(player_id=player_id, name=name)
         self.device = device
@@ -213,6 +214,7 @@ class MLAgent(BaseAgent):
         self.apply_repetition_heuristics = apply_repetition_heuristics
         self.threefold_imminent_penalty = threefold_imminent_penalty
         self.backtrack_penalty = backtrack_penalty
+        self.difficulty = difficulty.lower()
 
     def _load_model(self, model_path: Path | None, device: str) -> PolicyForwardModel | MoveScoringModel:
         if model_path is None:
@@ -337,6 +339,29 @@ class MLAgent(BaseAgent):
         move_scores = self.get_legal_move_scores(state)
         if not move_scores:
             return None
+
+        # Logic phân cấp độ khó: Hard (Max Prob), Medium/Easy (thêm Noise)
+        if self.difficulty != "hard":
+            # Phân tách điểm số hợp lệ (bỏ qua điểm phạt cực âm của luật lặp)
+            valid_scores = [s for _, s in move_scores if s > -10000.0]
+            if not valid_scores:
+                valid_scores = [s for _, s in move_scores]
+            
+            score_range = max(max(valid_scores) - min(valid_scores), 1e-5)
+            
+            # Gumbel noise factor: mô phỏng Temperature Sampling
+            temperature = 0.2 if self.difficulty == "medium" else 1.0
+            noise_scale = score_range * temperature
+
+            adjusted_scores = []
+            for mv, score in move_scores:
+                if score <= -10000.0:
+                    adjusted_scores.append((mv, score)) # Giữ nguyên hình phạt
+                else:
+                    # Gumbel noise
+                    noise = -math.log(-math.log(self.rng.random() + 1e-10))
+                    adjusted_scores.append((mv, score + noise * noise_scale))
+            move_scores = adjusted_scores
 
         # Stable argmax. If all scores are equal/invalid, Python keeps the first legal move.
         best_move, _best_score = max(move_scores, key=lambda item: item[1])

@@ -26,8 +26,11 @@ def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
     agent_cls = level_map.get(level, EasyAgent)
     return agent_cls(player_id=color, algorithm=algorithm)
 
-def _build_ml_agent(color: Color, model_path: str = None):
-    # Week 1: model_path is optional. Without a trained file, MLAgent loads a dummy model.
+def _build_ml_agent(color: Color, model_path: str = "models/checkpoints/best_model.pth"):
+    import os
+    if model_path and not os.path.exists(model_path):
+        print(f"[CẢNH BÁO] Không tìm thấy '{model_path}', sẽ dùng Dummy Model thay thế.")
+        model_path = None
     return MLAgent(player_id=color, model_path=model_path)
 
 
