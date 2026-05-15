@@ -153,7 +153,25 @@ class TorchPolicyAdapter:
         self._torch = torch
         self.device = device
         loaded = torch.load(str(model_path), map_location=device)
-        self.model = loaded["model"] if isinstance(loaded, dict) and "model" in loaded else loaded
+        
+        if isinstance(loaded, dict):
+            if "model" in loaded:
+                self.model = loaded["model"]
+            else:
+                # Nếu dict chứa "model_state_dict" (latest_checkpoint) hoặc là dict của trọng số (best_model)
+                try:
+                    from models.network import XiangQiResNet
+                    self.model = XiangQiResNet(num_blocks=5, channels=128)
+                    if "model_state_dict" in loaded:
+                        self.model.load_state_dict(loaded["model_state_dict"])
+                    else:
+                        self.model.load_state_dict(loaded)
+                except Exception as e:
+                    print(f"[CẢNH BÁO] Không thể tự động tạo mạng XiangQiResNet: {e}")
+                    self.model = loaded
+        else:
+            self.model = loaded
+
         if hasattr(self.model, "to"):
             self.model.to(device)
         if hasattr(self.model, "eval"):
