@@ -59,6 +59,7 @@ class GameLoop:
         black_agent: AgentLike,
         state: Optional[GameState] = None,
         max_turns: int = 200,
+        debug: bool = False,
     ) -> None:
         if max_turns <= 0:
             raise ValueError("max_turns must be positive")
@@ -71,11 +72,14 @@ class GameLoop:
         self.black_agent = black_agent
         self.state = state.clone() if state is not None else GameState()
         self.max_turns = max_turns
+        self.debug = debug
         self.history: list[TurnRecord] = []
         self._position_counts: dict[
             tuple[str, tuple[tuple[tuple[int, int], str, str], ...]], int
         ] = {game_loop_position_key(self.state): 1}
         self._finished_result: Optional[GameLoopResult] = None
+        if self.debug:
+            self.state.validate()
 
     @property
     def ply_count(self) -> int:
@@ -128,6 +132,9 @@ class GameLoop:
         if self.ply_count >= self.max_turns:
             return self._build_result(winner=None, reason="max_turns_reached")
 
+        if self.debug:
+            self.state.validate()
+
         agent = self.current_agent()
         side = self.state.side_to_move
         move = agent.select_move(self.state.clone())
@@ -138,6 +145,8 @@ class GameLoop:
 
         assert_legal_move(self.state, move)
         self.state.apply_move(move)
+        if self.debug:
+            self.state.validate()
 
         key = self._position_key()
         self._position_counts[key] = self._position_counts.get(key, 0) + 1
@@ -166,9 +175,10 @@ def run_game(
     black_agent: AgentLike,
     state: Optional[GameState] = None,
     max_turns: int = 200,
+    debug: bool = False,
 ) -> GameLoopResult:
     """Backward-compatible helper for running one complete backend match."""
-    return GameLoop(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns).play()
+    return GameLoop(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns, debug=debug).play()
 
 
 def run_headless_game(
@@ -176,6 +186,7 @@ def run_headless_game(
     black_agent: AgentLike,
     state: Optional[GameState] = None,
     max_turns: int = 200,
+    debug: bool = False,
 ) -> GameLoopResult:
     """Explicit Week 2 alias: run a match without pygame/UI."""
-    return run_game(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns)
+    return run_game(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns, debug=debug)

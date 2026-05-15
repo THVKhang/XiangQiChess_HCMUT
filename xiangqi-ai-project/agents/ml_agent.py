@@ -9,7 +9,6 @@ from typing import Any, Optional, Protocol, Sequence
 
 from agents.base_agent import BaseAgent
 from agents.search_agent import BACKTRACK_PENALTY, is_simple_backtrack
-from core.encoding import state_to_tensor
 from core.move import Move
 from core.move_generator import is_legal_move, legal_moves, result_if_terminal
 from core.policy_encoding import (
@@ -198,6 +197,13 @@ class TorchPolicyAdapter:
         return output.detach().flatten().cpu().tolist()
 
 
+ML_AGENT_LEVELS = {
+    "Easy":   {"temperature": 1.0, "apply_repetition_heuristics": False},
+    "Medium": {"temperature": 0.2, "apply_repetition_heuristics": False},
+    "Hard":   {"temperature": 0.0, "apply_repetition_heuristics": True},
+}
+
+
 class MLAgent(BaseAgent):
     """ML-based agent that plugs into the existing GameLoop interface.
 
@@ -208,6 +214,11 @@ class MLAgent(BaseAgent):
     4. reads the scores of legal moves only;
     5. applies luật phụ cho lặp vị trí / quay lui (tránh góc kẹt lặp nước);
     6. returns the highest-scoring legal move.
+
+    ``level`` (Easy/Medium/Hard) controls:
+    - Easy: High noise (temperature = 1.0), no repetition heuristics
+    - Medium: Low noise (temperature = 0.2), no repetition heuristics
+    - Hard: pure argmax (temperature = 0.0) + repetition heuristics enabled
     """
 
     def __init__(
@@ -218,21 +229,27 @@ class MLAgent(BaseAgent):
         name: str = "MLAgent",
         device: str = "cpu",
         rng: Optional[random.Random] = None,
+        level: str = "Hard",
         *,
-        apply_repetition_heuristics: bool = True,
+        apply_repetition_heuristics: bool | None = None,
+        temperature: float | None = None,
         threefold_imminent_penalty: float = 500_000.0,
         backtrack_penalty: float = BACKTRACK_PENALTY,
-        difficulty: str = "hard",
     ) -> None:
-        super().__init__(player_id=player_id, name=name)
+        level_cfg = ML_AGENT_LEVELS.get(level, ML_AGENT_LEVELS["Hard"])
+        resolved_temp = temperature if temperature is not None else level_cfg.get("temperature", 0.0)
+        resolved_rep = apply_repetition_heuristics if apply_repetition_heuristics is not None else level_cfg["apply_repetition_heuristics"]
+        agent_name = name if name != "MLAgent" else f"MLAgent({level})"
+        super().__init__(player_id=player_id, name=agent_name)
+        self.level = level
         self.device = device
         self.rng = rng if rng is not None else random.Random(0)
+        self.temperature = resolved_temp
         self.model_path = Path(model_path) if model_path else None
         self.model = model if model is not None else self._load_model(self.model_path, device)
-        self.apply_repetition_heuristics = apply_repetition_heuristics
+        self.apply_repetition_heuristics = resolved_rep
         self.threefold_imminent_penalty = threefold_imminent_penalty
         self.backtrack_penalty = backtrack_penalty
-        self.difficulty = difficulty.lower()
 
     def _load_model(self, model_path: Path | None, device: str) -> PolicyForwardModel | MoveScoringModel:
         if model_path is None:
@@ -280,7 +297,7 @@ class MLAgent(BaseAgent):
 
     def _prepare_state_tensor(self, state: GameState) -> Any:
         """Encode state into a consistent channels-first NumPy tensor for model inference."""
-        return state_to_tensor(state, channels_first=True, canonical=True, as_numpy=True)
+        return state.to_tensor(channels_first=True, canonical=True, as_numpy=True)
 
     def _forward_policy_scores(self, state_tensor: Any) -> list[float]:
         if hasattr(self.model, "forward"):
@@ -322,11 +339,13 @@ class MLAgent(BaseAgent):
         for i, mv in enumerate(moves):
             if is_simple_backtrack(state, mv):
                 adjusted[i] -= self.backtrack_penalty
-            trial = state.clone()
-            trial.apply_move(mv)
-            new_key = game_loop_position_key(trial)
-            if visit_counts.get(new_key, 0) + 1 >= 3:
-                adjusted[i] -= self.threefold_imminent_penalty
+            undo = state.apply_move(mv)
+            try:
+                new_key = game_loop_position_key(state)
+                if visit_counts.get(new_key, 0) + 1 >= 3:
+                    adjusted[i] -= self.threefold_imminent_penalty
+            finally:
+                state.undo_move(undo)
         return adjusted
 
     def get_legal_move_scores(self, state: GameState) -> list[tuple[Move, float]]:
@@ -358,18 +377,15 @@ class MLAgent(BaseAgent):
         if not move_scores:
             return None
 
-        # Logic phân cấp độ khó: Hard (Max Prob), Medium/Easy (thêm Noise)
-        if self.difficulty != "hard":
+        # Logic phân cấp độ khó bằng Noise (Temperature Sampling)
+        if self.temperature > 0.0:
             # Phân tách điểm số hợp lệ (bỏ qua điểm phạt cực âm của luật lặp)
             valid_scores = [s for _, s in move_scores if s > -10000.0]
             if not valid_scores:
                 valid_scores = [s for _, s in move_scores]
             
             score_range = max(max(valid_scores) - min(valid_scores), 1e-5)
-            
-            # Gumbel noise factor: mô phỏng Temperature Sampling
-            temperature = 0.2 if self.difficulty == "medium" else 1.0
-            noise_scale = score_range * temperature
+            noise_scale = score_range * self.temperature
 
             adjusted_scores = []
             for mv, score in move_scores:

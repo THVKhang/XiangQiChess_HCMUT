@@ -1,3 +1,4 @@
+import os
 import sys
 import pygame
 
@@ -15,6 +16,8 @@ from ui.menu import Menu
 WINDOW_WIDTH = 1000
 WINDOW_HEIGHT = 760
 FPS = 67
+
+DEBUG_STATE = os.getenv("XIANGQI_DEBUG_STATE", "0").lower() in {"1", "true", "yes", "on"}
 
 
 def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
@@ -34,17 +37,17 @@ def _build_ml_agent(color: Color, model_path: str = "models/checkpoints/best_mod
     return MLAgent(player_id=color, model_path=model_path)
 
 
-def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None):
+def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None, ml_level: str = "Hard"):
     if mode == "Human vs AI":
         return Color.RED, None, _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
     if mode == "Human vs ML":
-        return Color.RED, None, _build_ml_agent(Color.BLACK)
+        return Color.RED, None, _build_ml_agent(Color.BLACK, level=ml_level)
     if mode == "AI vs Random":
         return None, _build_search_agent(level, Color.RED, algorithm="alphabeta"), RandomAgent(player_id=Color.BLACK)
     if mode == "ML vs Random":
-        return None, _build_ml_agent(Color.RED), RandomAgent(player_id=Color.BLACK)
+        return None, _build_ml_agent(Color.RED, level=ml_level), RandomAgent(player_id=Color.BLACK)
     if mode == "ML vs Search":
-        return None, _build_ml_agent(Color.RED), _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
+        return None, _build_ml_agent(Color.RED, level=ml_level), _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
     if mode == "AI vs AI":
         red_lv = red_level or level
         black_lv = black_level or level
@@ -144,6 +147,7 @@ def main():
                         menu.selected_level,
                         red_level=menu.selected_red_level,
                         black_level=menu.selected_black_level,
+                        ml_level=menu.selected_ml_level,
                     )
                     ai_elapsed_ms = 0
                     processed_plies = 0
@@ -215,6 +219,8 @@ def main():
                     ai_elapsed_ms = 0
                     agent = red_agent if state.side_to_move == Color.RED else black_agent
                     if agent is not None:
+                        if DEBUG_STATE:
+                            state.validate()
                         ai_move = agent.select_move(state.clone())
                         if ai_move is None:
                             game_ui.status_message = f"{agent.name}: no legal move"
@@ -222,6 +228,8 @@ def main():
                             try:
                                 assert_legal_move(state, ai_move)
                                 state.apply_move(ai_move)
+                                if DEBUG_STATE:
+                                    state.validate()
                                 game_ui.last_move = (ai_move.src, ai_move.dst)
                                 game_ui.status_message = f"{agent.name} moved: {ai_move.src} -> {ai_move.dst}"
                             except Exception as exc:
