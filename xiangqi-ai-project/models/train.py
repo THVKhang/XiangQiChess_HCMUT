@@ -8,6 +8,30 @@ from dataset import get_dataloader
 from network import XiangQiResNet
 from torch.utils.tensorboard import SummaryWriter
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except Exception:
+        return default
+
 def calculate_value_accuracy(outputs, targets, threshold=0.33):
     """
     Tính Accuracy cho Value Head bằng cách làm tròn Output:
@@ -32,6 +56,16 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
+    run_name = os.getenv("XIANGQI_RUN_NAME", "xiangqi_experiment_1")
+    reset = _env_flag("XIANGQI_RESET", False)
+    num_epochs = _env_int("XIANGQI_EPOCHS", 50)
+    batch_size = _env_int("XIANGQI_BATCH_SIZE", 1024)
+    num_workers = _env_int("XIANGQI_NUM_WORKERS", 2)
+    train_batch_limit = _env_int("XIANGQI_TRAIN_BATCH_LIMIT", 0)
+    val_batch_limit = _env_int("XIANGQI_VAL_BATCH_LIMIT", 0)
+    lr = _env_float("XIANGQI_LR", 1e-3)
+    weight_decay = _env_float("XIANGQI_WEIGHT_DECAY", 1e-2)
+
     # 2. Khởi tạo mô hình
     model = XiangQiResNet(num_blocks=5, channels=128).to(device)
     
@@ -39,26 +73,24 @@ def train():
     criterion_v = nn.MSELoss()
     criterion_p = nn.CrossEntropyLoss()
     
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-2)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
     
     # 4. Cấu hình thư mục và Dataloader
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    save_dir = os.path.join(current_dir, "checkpoints")
+    save_dir = os.getenv("XIANGQI_SAVE_DIR") or os.path.join(current_dir, "checkpoints")
     os.makedirs(save_dir, exist_ok=True)
     
     project_dir = os.path.dirname(current_dir)
     train_h5_path = os.path.join(project_dir, "data", "xiangqi_train.h5") # Đổi tên vì preprocess tạo thẳng file này
     val_h5_path = os.path.join(project_dir, "data", "xiangqi_val.h5")
-    batch_size = 1024  
     
     print(f"Preparing Train and Val DataLoaders from HDF5...")
-    train_loader = get_dataloader(train_h5_path, batch_size=batch_size, num_workers=2)
-    val_loader = get_dataloader(val_h5_path, batch_size=batch_size, num_workers=2)
+    train_loader = get_dataloader(train_h5_path, batch_size=batch_size, num_workers=num_workers)
+    val_loader = get_dataloader(val_h5_path, batch_size=batch_size, num_workers=num_workers)
     
     # 5. Thông số vòng lặp và Resume Training Logic
-    num_epochs = 50
     start_epoch = 0
     best_val_loss = float('inf')
     patience = 5  
@@ -66,7 +98,7 @@ def train():
     
     # Load model từ best_model.pth (Fine-tuning / Transfer Learning)
     best_model_path = os.path.join(save_dir, "best_model.pth")
-    if os.path.exists(best_model_path):
+    if (not reset) and os.path.exists(best_model_path):
         print(f"\n[INFO] Tìm thấy file best_model: {best_model_path}")
         print("[INFO] Bắt đầu quá trình Fine-tuning từ trọng số này.")
         state_dict = torch.load(best_model_path, map_location=device)
@@ -75,9 +107,9 @@ def train():
         start_epoch = 0
         best_val_loss = float('inf')
     else:
-        print("\n[INFO] Không tìm thấy best_model cũ. Học lại từ đầu!")
+        print("\n[INFO] Học từ đầu (reset hoặc không có best_model cũ).")
         
-    log_dir = os.path.join(current_dir, "runs", "xiangqi_experiment_1")
+    log_dir = os.path.join(current_dir, "runs", run_name)
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logging at: {log_dir}")
     
@@ -99,6 +131,8 @@ def train():
         print(f"\n--- Epoch {epoch+1}/{num_epochs} [LR: {scheduler.get_last_lr()[0]:.1e}] ---")
         
         for batch_idx, (inputs, (targets_p, targets_v)) in enumerate(train_loader):
+            if train_batch_limit > 0 and batch_idx >= train_batch_limit:
+                break
             inputs, targets_p, targets_v = inputs.to(device), targets_p.to(device), targets_v.to(device)
             
             optimizer.zero_grad()
@@ -147,7 +181,9 @@ def train():
         
         print(f"Running Validation...")
         with torch.no_grad():
-            for inputs, (targets_p, targets_v) in val_loader:
+            for batch_idx, (inputs, (targets_p, targets_v)) in enumerate(val_loader):
+                if val_batch_limit > 0 and batch_idx >= val_batch_limit:
+                    break
                 inputs, targets_p, targets_v = inputs.to(device), targets_p.to(device), targets_v.to(device)
                 
                 with autocast():

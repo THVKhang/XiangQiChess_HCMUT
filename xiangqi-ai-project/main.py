@@ -29,12 +29,16 @@ def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
     agent_cls = level_map.get(level, EasyAgent)
     return agent_cls(player_id=color, algorithm=algorithm)
 
-def _build_ml_agent(color: Color, model_path: str = "models/checkpoints/best_model.pth"):
-    import os
-    if model_path and not os.path.exists(model_path):
-        print(f"[CẢNH BÁO] Không tìm thấy '{model_path}', sẽ dùng Dummy Model thay thế.")
-        model_path = None
-    return MLAgent(player_id=color, model_path=model_path)
+def _build_ml_agent(color: Color, level: str = "Hard", model_path: str | None = None):
+    resolved_path = (
+        model_path
+        if model_path is not None
+        else (os.getenv("XIANGQI_ML_MODEL_PATH") or "models/checkpoints/best_model.pth")
+    )
+    if resolved_path and not os.path.exists(resolved_path):
+        print(f"[CẢNH BÁO] Không tìm thấy '{resolved_path}', sẽ dùng Dummy Model thay thế.")
+        resolved_path = None
+    return MLAgent(player_id=color, model_path=resolved_path, level=level)
 
 
 def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None, ml_level: str = "Hard"):
