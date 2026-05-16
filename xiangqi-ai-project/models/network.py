@@ -45,18 +45,34 @@ class XiangQiResNet(nn.Module):
         self.value_conv = nn.Conv2d(channels, 2, kernel_size=1, bias=False)
         self.value_bn = nn.BatchNorm2d(2)
         
+        # --- Policy Head ---
+        self.policy_conv = nn.Conv2d(channels, 2, kernel_size=1, bias=False)
+        self.policy_bn = nn.BatchNorm2d(2)
+        self.policy_fc = nn.Linear(2 * 10 * 9, 8100)
         
+        # --- Value Head Dense Layers ---
         self.value_fc1 = nn.Linear(2 * 10 * 9, 256)
+        self.dropout = nn.Dropout(0.3)
         self.value_fc2 = nn.Linear(256, 1)
 
     def forward(self, x):
+        # Backbone
         x = F.relu(self.bn_input(self.conv_input(x)))
         x = self.res_blocks(x)  
+        
+        # Policy Head
+        p = F.relu(self.policy_bn(self.policy_conv(x)))
+        p = torch.flatten(p, 1)
+        p = self.policy_fc(p) # Logits for CrossEntropyLoss
+        
+        # Value Head
         v = F.relu(self.value_bn(self.value_conv(x))) 
         v = torch.flatten(v, 1) 
         v = F.relu(self.value_fc1(v))
+        v = self.dropout(v)
         v = self.value_fc2(v)
-        return torch.sigmoid(v)
+        # Hàm Tanh ép giá trị dự đoán về khoảng [-1.0, 1.0] (Thua, Hòa, Thắng)
+        return p, torch.tanh(v)
 
 if __name__ == "__main__":
     # Test script
@@ -66,12 +82,13 @@ if __name__ == "__main__":
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     
     dummy_input = torch.randn(4, 15, 10, 9)
-    output = model(dummy_input)
+    policy_out, value_out = model(dummy_input)
     
     print("--- MODEL ARCHITECTURE ---")
     print(model)
     print(f"\nTotal Trainable Parameters: {total_params:,}")
     print("\n--- SHAPE TEST ---")
     print(f"Input shape : {dummy_input.shape} (Batch, Channels, Rows, Cols)")
-    print(f"Output shape: {output.shape} (Batch, TargetValue)")
-    print(f"Output Value: \n{output.detach().numpy()}")
+    print(f"Policy Output shape: {policy_out.shape} (Batch, 8100 Moves)")
+    print(f"Value Output shape: {value_out.shape} (Batch, 1 TargetValue)")
+    print(f"Value Output: \n{value_out.detach().numpy()}")

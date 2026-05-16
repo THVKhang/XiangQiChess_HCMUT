@@ -68,7 +68,8 @@ def state_to_tensor(
                 "Install it first (e.g. `pip install numpy`)."
             ) from exc
 
-        x = np.zeros((15, BOARD_ROWS, BOARD_COLS), dtype=getattr(np, dtype))
+        np_dtype = np.float32 if dtype == "float32" else np.float64
+        x = np.zeros((15, BOARD_ROWS, BOARD_COLS), dtype=np_dtype)
         side_val = 1.0 if state.side_to_move == Color.RED else 0.0
 
         flip = canonical and state.side_to_move == Color.BLACK
@@ -88,7 +89,7 @@ def state_to_tensor(
 
         if channels_first:
             return x
-        return np.transpose(x, (1, 2, 0))
+        return x.transpose(1, 2, 0)
 
     # Pure-Python nested lists path (no extra deps)
     x: list[list[list[float]]] = [

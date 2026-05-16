@@ -1,8 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 from agents.ml_agent import MLAgent
 from agents.search_agent import EasyAgent, HardAgent, LevelAgent, MediumAgent
-from core.move_generator import is_legal_move
+from core.move_generator import GameResult, is_legal_move
 from core.rules import Color
 from core.state import GameState
 
@@ -68,6 +69,23 @@ class TestSearchAgents(unittest.TestCase):
         move = agent.select_move(self.state.clone())
         self.assertIsNotNone(move)
         self.assertTrue(is_legal_move(self.state, move))
+
+    @patch("agents.ml_agent.result_if_terminal")
+    def test_ml_agent_skips_inference_on_terminal_position(self, mock_terminal):
+        """Chiếu bí / cờ kết thúc: không chạy policy, trả None và không có điểm nước đi."""
+
+        class ExplodingModel:
+            def forward(self, *_a, **_k):
+                raise AssertionError("forward must not run on terminal states")
+
+            def score_moves(self, *_a, **_k):
+                raise AssertionError("score_moves must not run on terminal states")
+
+        mock_terminal.return_value = GameResult(winner=Color.RED, reason="checkmate")
+        agent = MLAgent(player_id=Color.RED, model=ExplodingModel())
+
+        self.assertEqual(agent.get_legal_move_scores(GameState()), [])
+        self.assertIsNone(agent.select_move(GameState()))
 
 
 if __name__ == "__main__":

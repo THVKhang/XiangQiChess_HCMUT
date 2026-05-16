@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from agents.human_player import HumanPlayer
-from agents.ml_agent import DummyMoveScoringModel, MLAgent
+from agents.ml_agent import DummyMoveScoringModel, MLAgent, POLICY_SIZE
 from agents.random_agent import RandomAgent
 from core.move import Move
 from core.move_generator import legal_moves
@@ -168,6 +168,33 @@ class TestGameLoop(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             agent.select_move(GameState())
+
+
+    def test_dummy_model_forward_returns_full_policy_vector(self):
+        state = GameState()
+        agent = MLAgent(player_id=Color.RED, model=DummyMoveScoringModel())
+        state_tensor = agent.get_legal_move_scores(state)  # also exercises forward + legal-score mapping
+
+        self.assertGreater(len(state_tensor), 0)
+        self.assertTrue(all(move in legal_moves(state) for move, _score in state_tensor))
+        self.assertEqual(len(DummyMoveScoringModel().forward(__import__('core.encoding', fromlist=['state_to_tensor']).state_to_tensor(state, canonical=True))), POLICY_SIZE)
+
+    def test_ml_agent_loads_dummy_json_model(self):
+        agent = MLAgent(player_id=Color.RED, model_path='models/dummy_policy.json')
+        move = agent.select_move(GameState())
+
+        self.assertIn(move, legal_moves(GameState()))
+
+    def test_ml_vs_random_headless_checkpoint_runs(self):
+        result = run_game(
+            MLAgent(player_id=Color.RED, model_path='models/dummy_policy.json'),
+            RandomAgent(player_id=Color.BLACK, rng=random.Random(13)),
+            max_turns=10,
+        )
+
+        self.assertIn(result.reason, {'max_turns_reached', 'general_captured', 'checkmate', 'stalemate', 'threefold_repetition'})
+        self.assertGreaterEqual(len(result.history), 1)
+        self.assertEqual(result.history[0].agent_name, 'MLAgent')
 
 if __name__ == "__main__":
     unittest.main()

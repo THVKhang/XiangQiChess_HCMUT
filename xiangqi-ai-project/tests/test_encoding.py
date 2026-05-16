@@ -15,6 +15,19 @@ class TestEncoding(unittest.TestCase):
         self.assertEqual(len(x[0]), 10)
         self.assertEqual(len(x[0][0]), 9)
 
+    def test_game_state_to_tensor_matches_function(self):
+        st = GameState()
+        x_func = state_to_tensor(st, channels_first=True, canonical=False, as_numpy=False)
+        x_method = st.to_tensor(channels_first=True, canonical=False, as_numpy=False)
+        self.assertEqual(x_func, x_method)
+
+    def test_game_state_tensor_sequence_matches_function(self):
+        st = GameState()
+        moves = [Move((6, 0), (5, 0)), Move((3, 0), (4, 0))]
+        seq_func = game_to_tensor_sequence(st, moves, include_initial=True, include_final=True, as_numpy=False)
+        seq_method = st.tensor_sequence(moves, include_initial=True, include_final=True, as_numpy=False)
+        self.assertEqual(seq_func, seq_method)
+
     def test_initial_positions_some_spots(self):
         st = GameState()
         x = state_to_tensor(st, channels_first=True, canonical=False, as_numpy=False)
