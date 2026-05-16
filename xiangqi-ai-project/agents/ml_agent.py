@@ -39,16 +39,58 @@ class DummyMoveScoringModel:
     prefer_capture_bonus: float = 100.0
     center_bonus: float = 1.0
 
+    # Piece importance for move prioritization
+    PIECE_MOVE_WEIGHT: dict = None
+    
+    def __post_init__(self):
+        if self.PIECE_MOVE_WEIGHT is None:
+            from core.rules import PieceType
+            object.__setattr__(self, 'PIECE_MOVE_WEIGHT', {
+                PieceType.ROOK: 5.0,      # Xe — ưu tiên cao nhất
+                PieceType.CANNON: 4.0,    # Pháo
+                PieceType.HORSE: 3.5,     # Mã
+                PieceType.SOLDIER: 1.0,   # Tốt — ưu tiên thấp
+                PieceType.ADVISOR: 0.5,
+                PieceType.ELEPHANT: 0.5,
+                PieceType.GENERAL: 0.2,
+            })
+
     def score_moves(self, state_tensor: Any, legal_move_list: Sequence[Move]) -> list[float]:
+        from core.rules import PieceType, on_own_side_of_river
+        
         scores: list[float] = []
         center_r = (BOARD_ROWS - 1) / 2.0
         center_c = (BOARD_COLS - 1) / 2.0
+        
         for idx, move in enumerate(legal_move_list):
             dst_r, dst_c = move.dst
-            distance_to_center = abs(dst_r - center_r) + abs(dst_c - center_c)
+            src_r, src_c = move.src
+            
+            # Capture bonus
             capture_score = self.prefer_capture_bonus if move.capture is not None else 0.0
-            # Small deterministic tie-breaker keeps repeated runs reproducible.
-            scores.append(capture_score - self.center_bonus * distance_to_center - idx * 1e-6)
+            
+            # Piece-type bonus: prioritize moving strong pieces
+            piece_weight = 1.0
+            if hasattr(move, '_piece') and move._piece is not None:
+                piece_weight = self.PIECE_MOVE_WEIGHT.get(move._piece.kind, 1.0)
+            else:
+                # Heuristic based on source position (starting positions of pieces)
+                # Rooks start at corners, Horses at (9,1)/(9,7), Cannons at (7,1)/(7,7)
+                piece_weight = 2.0  # default moderate
+                
+            # Forward progress bonus — reward moves toward enemy side
+            forward_bonus = (center_r - abs(dst_r - center_r)) * 0.5
+            
+            # Center column control
+            center_dist = abs(dst_c - center_c)
+            center_bonus_val = -self.center_bonus * center_dist
+            
+            total = (capture_score 
+                    + piece_weight * 10.0 
+                    + forward_bonus * 3.0
+                    + center_bonus_val
+                    - idx * 1e-6)
+            scores.append(total)
         return scores
 
 
@@ -184,6 +226,22 @@ class MLAgent(BaseAgent):
             as_numpy=False,
         )
         safe_scores = self._safe_score_moves(state_tensor, moves)
+
+        # Anti-repetition: penalize moves that go back to where we just came from
+        history = state.move_history
+        for i, move in enumerate(moves):
+            # Penalize simple backtrack (A->B then B->A)
+            if len(history) >= 2:
+                last_own = history[-2]
+                if last_own.src == move.dst and last_own.dst == move.src:
+                    safe_scores[i] -= 500.0
+            # Penalize longer cycles
+            if len(history) >= 4:
+                own_prev2 = history[-4]
+                own_prev = history[-2]
+                if move.dst == own_prev2.src and move.src == own_prev.dst:
+                    safe_scores[i] -= 800.0
+
         # Stable argmax. If all scores are equal/invalid, keep the first legal move.
         best_idx = max(range(len(moves)), key=lambda i: safe_scores[i])
         return moves[best_idx]

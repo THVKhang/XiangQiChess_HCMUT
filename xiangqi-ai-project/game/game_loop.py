@@ -41,7 +41,7 @@ class GameLoop:
         red_agent: AgentLike,
         black_agent: AgentLike,
         state: Optional[GameState] = None,
-        max_turns: int = 200,
+        max_turns: int = 500,
     ) -> None:
         self.red_agent = red_agent
         self.black_agent = black_agent
@@ -122,6 +122,6 @@ def run_game(
     red_agent: AgentLike,
     black_agent: AgentLike,
     state: Optional[GameState] = None,
-    max_turns: int = 200,
+    max_turns: int = 500,
 ) -> GameLoopResult:
     return GameLoop(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns).play()

@@ -1,0 +1,580 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                               PREAMBLE                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[a4paper,12pt]{article}
+
+%---------- LANGUAGE & FONT SUPPORT ----------%
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{mathptmx}
+\usepackage{inconsolata}
+
+%---------- COMMON PACKAGES ----------%
+\usepackage{float}
+\usepackage{textcomp}
+\usepackage{geometry}
+\geometry{
+  a4paper,
+  total={170mm,257mm},
+  left=20mm,
+  top=20mm,
+  includefoot,
+}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xurl}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  filecolor=magenta,
+  urlcolor=blue,
+  citecolor=black,
+}
+\usepackage{booktabs,makecell,tabularx}
+\usepackage{longtable}
+\usepackage{caption}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{ragged2e}
+\usepackage[protrusion=false, expansion=false]{microtype}
+
+%---------- LIST CONFIGURATION ----------%
+\setlist[itemize,1]{label=--, labelsep=0.6em}
+\setlist[itemize,2]{label=\textbullet}
+\setlist[enumerate,1]{leftmargin=*,nosep}
+\newcolumntype{L}{>{\bfseries}p{28mm}}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\emergencystretch=2em
+
+%---------- MACROS ----------%
+\newcommand{\citenum}[1]{\textsuperscript{[#1]}}
+\newcommand{\sys}[1]{\nolinkurl{#1}}
+\newcommand{\sysbf}[1]{\textbf{\nolinkurl{#1}}}
+
+%---------- CODE DISPLAY CONFIGURATION ----------%
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codeblue}{rgb}{0.0, 0.0, 1.0}
+\definecolor{codered}{rgb}{1.0, 0.0, 0.0}
+\definecolor{backcolour}{rgb}{1.0, 1.0, 1.0}
+
+\lstdefinestyle{PythonStyle}{
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{codeblue},
+  stringstyle=\color{codered},
+  basicstyle=\ttfamily\small,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=none,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  frame=single,
+  rulecolor=\color{black},
+}
+\lstset{style=PythonStyle}
+
+%---------- HEADER & FOOTER CONFIGURATION ----------%
+\setlength{\headheight}{52pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{%
+  \begin{tabular}{rl}
+    \includegraphics[width=8mm,height=8mm]{Image/hcmut.jpg} &
+    \begin{tabular}{l}
+      \textbf{\ttfamily Ho Chi Minh City University of Technology}\\
+      \textbf{\ttfamily Faculty of Computer Science and Engineering}
+    \end{tabular}
+  \end{tabular}
+}
+\fancyfoot[L]{\scriptsize \ttfamily Assignment 2 \textemdash{} Introduction to Artificial Intelligence}
+\fancyfoot[R]{\scriptsize \ttfamily Page \thepage/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.3pt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                            DOCUMENT BODY                           %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+%---------- TITLE PAGE ----------%
+\begin{titlepage}
+  \thispagestyle{empty}
+  \newcommand{\HRule}{\rule{\linewidth}{0.6pt}}
+  \begin{center}
+    \vspace*{6mm}
+    \textbf{VIETNAM NATIONAL UNIVERSITY \textemdash{} HO CHI MINH CITY}\\
+    \textbf{HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY}\\
+    \textbf{FACULTY OF COMPUTER SCIENCE AND ENGINEERING}
+    \vspace{12mm}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=50mm]{Image/hcmut.jpg}
+    \end{figure}
+    \vspace{14mm}
+
+    \begin{center}
+        {\Large \bfseries INTRODUCTION TO ARTIFICIAL INTELLIGENCE}
+        \vspace{1.5cm}
+
+        \HRule\\[0.5cm]
+        {\Large \textbf{Assignment 2 Report}}\\[0.5cm]
+        {\huge \bfseries Search-Based Xiangqi Agent (Depth Search and Heuristic Search)}\\[0.5cm]
+    \end{center}
+
+    \vspace{6mm}
+    \HRule{}
+    \vspace{20mm}
+
+    \begin{tabular}{@{}l l@{}}
+    \textbf{Instructor:} & Dr.\ Tran Hong Tai \\
+    \addlinespace[6pt]
+    \textbf{Group:} & NewBoyAI \\
+    \addlinespace[4pt]
+    \multicolumn{2}{@{}l}{\textbf{Members:}} \\
+    & Duong Dang Khoa \textemdash{} [2352551] \\
+    & Tran Hoang Vy Khang \textemdash{} [2352502] \\
+    & Nguyen Duc Gia Bao \textemdash{} [2352095] \\
+    & Dong Cong Khanh \textemdash{} [2352517] \\
+    & Nguyen Duc Hanh Nhi \textemdash{} [2252578] \\
+    \end{tabular}
+
+    \vfill
+    {\large Ho Chi Minh City, April 2026}
+  \end{center}
+\end{titlepage}
+
+%---------- TABLE OF CONTENTS ----------%
+\tableofcontents
+\newpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                         GENERAL INTRODUCTION                       %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Objectives}
+
+This assignment focuses on building a \textbf{search-based game-playing agent} for \textbf{Xiangqi (Chinese Chess)}.
+The implementation targets a large state-space adversarial game and satisfies the project requirements without using machine learning.
+
+Main objectives:
+\begin{itemize}
+    \item Implement a rule-correct Xiangqi engine (state, moves, legality, terminal conditions).
+    \item Implement and compare two search paradigms:
+    \begin{itemize}
+        \item \textbf{Depth Search:} Minimax
+        \item \textbf{Heuristic Search:} Alpha-Beta with evaluation function and move ordering
+    \end{itemize}
+    \item Provide multiple AI levels (Easy, Medium, Hard).
+    \item Support practical evaluation through automated tests and benchmarking scripts.
+\end{itemize}
+
+\section{Introduction}
+
+Xiangqi is a deterministic, perfect-information, turn-based zero-sum game with a high branching factor and deep tactical interactions. Exhaustive search is infeasible in practice, so the project applies selective game-tree search with domain heuristics.
+
+The system is implemented in Python with a modular architecture:
+\begin{itemize}
+    \item \textbf{core/}: rules, board/state representation, legal move generation.
+    \item \textbf{agents/}: random agent, minimax/alpha-beta search agents, level wrappers.
+    \item \textbf{game/}: backend game loop and match execution.
+    \item \textbf{ui/}: Pygame visualization and interaction.
+    \item \textbf{tests/}: unit tests for correctness and regression safety.
+    \item \textbf{evaluation/}: script-based evaluation and result export.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                          SYSTEM OVERVIEW                           %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Game Definition and Problem Formulation}
+
+\subsection{Adversarial Search Model}
+
+Xiangqi is modeled as a two-player deterministic zero-sum game:
+\[
+\langle S, A, T, U \rangle
+\]
+where:
+\begin{itemize}
+  \item $S$ is the set of valid game states,
+  \item $A(s)$ is the legal action set at state $s$,
+  \item $T(s,a)$ is the transition function,
+  \item $U(s)$ is utility at terminal states (win/loss/draw).
+\end{itemize}
+
+The search agents do not learn from data; they approximate best action by exploring the game tree from current state and applying a handcrafted evaluation at cut-off depth.
+
+\subsection{Rules and Terminal Conditions}
+
+The implementation enforces Xiangqi movement rules for all piece types, including constraints such as palace boundaries, river crossing behavior, horse leg blocking, cannon screen captures, and facing-generals restriction.
+
+Terminal handling includes:
+\begin{itemize}
+    \item General captured,
+    \item Checkmate,
+    \item Stalemate,
+    \item Threefold repetition draw (to avoid infinite loops).
+\end{itemize}
+
+\subsection{State Representation}
+
+A game state includes:
+\begin{itemize}
+    \item Board piece layout,
+    \item Side to move,
+    \item Move history.
+\end{itemize}
+
+For each search expansion, successor states are generated from legal moves only. This keeps the tree valid by construction and simplifies terminal checks.
+
+\subsection{Core Engine Design Decisions}
+
+To keep the engine robust for both gameplay and search, the implementation follows these decisions:
+\begin{itemize}
+  \item \textbf{Immutable move objects}: move records are frozen to avoid accidental mutation.
+  \item \textbf{Explicit apply/undo path}: search recursion can safely traverse and roll back states.
+  \item \textbf{Single legality source}: all agents rely on the same \texttt{legal\_moves} API.
+  \item \textbf{Terminal-first handling}: checkmate/general-capture/stalemate/repetition are checked consistently in loop and search utility.
+\end{itemize}
+
+This architecture prevents divergence between UI behavior and backend search behavior.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                           SEARCH METHODS                           %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Search Algorithms}
+
+\subsection{Depth Search: Minimax}
+
+Minimax searches the game tree by alternating maximizing and minimizing layers:
+\[
+V(s) =
+\begin{cases}
+\max\limits_{a \in A(s)} V(T(s,a)), & \text{if max node} \\
+\min\limits_{a \in A(s)} V(T(s,a)), & \text{if min node}
+\end{cases}
+\]
+
+In this project, Minimax is used as the depth-search baseline and appears explicitly in AI-vs-AI mode for comparison.
+
+\paragraph{How Minimax is implemented in this project}
+The implementation follows this sequence:
+\begin{enumerate}
+  \item Generate all legal moves from current state (using \texttt{legal\_moves} (state)).
+  \item Apply one move to create a child state.
+  \item Recursively evaluate child states until depth limit.
+  \item At leaf level:
+  \begin{itemize}
+    \item If terminal position: use terminal utility with very large magnitude.
+    \item Otherwise: use evaluation function score.
+  \end{itemize}
+  \item Back-propagate by \texttt{max} at maximizing nodes and \texttt{min} at minimizing nodes.
+\end{enumerate}
+
+\paragraph{Complexity perspective}
+If branching factor is $b$ and search depth is $d$, plain Minimax complexity is approximately:
+\[
+O(b^d)
+\]
+In Xiangqi, this grows quickly; therefore Minimax is mainly used as a depth-search reference and comparison baseline.
+
+\paragraph{Strengths and limitations}
+\begin{itemize}
+  \item Strength: conceptually simple, deterministic baseline for depth search.
+  \item Limitation: explores many unnecessary nodes without pruning, so slower at deeper levels.
+\end{itemize}
+
+\subsection{Heuristic Search: Alpha-Beta}
+
+Alpha-Beta pruning reduces the number of expanded nodes while preserving Minimax-optimal decisions:
+\begin{itemize}
+    \item $\alpha$: best lower bound for maximizing player,
+    \item $\beta$: best upper bound for minimizing player,
+    \item prune when $\alpha \ge \beta$.
+\end{itemize}
+
+Move ordering is used to improve pruning efficiency, especially at medium/hard levels.
+
+  \paragraph{How Alpha-Beta is implemented in this project}
+  The engine extends Minimax with three practical optimizations:
+  \begin{itemize}
+    \item \textbf{Pruning}: skip subtrees when bounds prove they cannot affect final decision.
+    \item \textbf{Move ordering}: prioritize tactical moves first (capture priority), improving early cut-offs.
+    \item \textbf{Caching}: transposition/evaluation caches reduce repeated computation for equivalent states.
+  \end{itemize}
+
+  \paragraph{Practical effect}
+  Compared with pure Minimax at the same depth, Alpha-Beta typically searches fewer nodes and returns a move faster. This is why Alpha-Beta is used as the primary heuristic-search agent.
+
+  \paragraph{Complexity perspective}
+  Worst-case complexity remains $O(b^d)$, but with effective move ordering the practical explored-node count is significantly reduced. In favorable ordering cases, the effective search depth achievable under fixed time budget is much higher than plain Minimax.
+
+\subsection{Evaluation Function}
+
+The heuristic evaluation combines:
+\begin{itemize}
+    \item Material values (general, rook, cannon, horse, advisor, elephant, soldier),
+    \item Positional adjustments (for example, soldier advancement and piece activity).
+\end{itemize}
+
+Terminal utility is assigned a very large magnitude to prioritize forced wins and avoid losing lines:
+\[
+U_{terminal} = \pm M, \quad M \gg \text{material scale}
+\]
+
+\paragraph{Why terminal utility is critical}
+Without strong terminal utility, an agent may prefer local material gain over forced checkmate lines. Assigning very large terminal utility ensures tactical correctness: immediate forced win is always prioritized over non-terminal heuristic improvements.
+
+\subsection{Algorithm Assignment in Modes}
+
+\begin{itemize}
+  \item \textbf{Human vs AI}: AI side uses search agent with selected level.
+  \item \textbf{AI vs Random}: search agent vs random baseline for capability comparison.
+  \item \textbf{AI vs AI}: Red uses Alpha-Beta (heuristic search), Black uses Minimax (depth search), with separate side-level selection.
+\end{itemize}
+
+This mapping is intentionally chosen to satisfy Assignment 2's requirement of demonstrating both depth search and heuristic search in gameplay.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                         AI MODES AND LEVELS                        %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Agent Modes and Difficulty Design}
+
+\subsection{Game Modes}
+
+\begin{itemize}
+    \item \textbf{Human vs AI}: human controls Red, AI controls Black.
+    \item \textbf{AI vs Random}: search AI (Red) versus random baseline (Black).
+    \item \textbf{AI vs AI}: two search AIs with separate side configuration.
+\end{itemize}
+
+\subsection{Assignment 2 Search Configuration}
+
+In AI-vs-AI demonstration mode:
+\begin{itemize}
+    \item \textbf{Red AI}: Heuristic Search (Alpha-Beta)
+    \item \textbf{Black AI}: Depth Search (Minimax)
+\end{itemize}
+
+The UI supports separate Red/Black level selection in this mode.
+
+\subsection{Difficulty Levels}
+
+Levels are mapped to search depth and search features:
+\begin{itemize}
+    \item Easy: shallow search.
+    \item Medium: deeper search with stronger evaluation.
+    \item Hard: strongest practical depth with ordering.
+\end{itemize}
+
+This provides a clear poor-average-good progression as required by the assignment.
+
+\subsection{Assignment Requirement Traceability}
+
+The implementation-to-requirement mapping is summarized below:
+\begin{itemize}
+  \item \textbf{Play by rules}: enforced by \texttt{core/rules.py}, \texttt{core/move\_generator.py}, and rule-focused tests.
+  \item \textbf{Defeat random baseline}: supported by AI-vs-Random mode and evaluation script automation.
+  \item \textbf{Multiple skill levels}: Easy/Medium/Hard with level-dependent search profile.
+  \item \textbf{Search only}: Minimax and Alpha-Beta only, no ML model/training pipeline.
+  \item \textbf{Evaluation workflow}: automated tests + evaluation export (JSON/CSV).
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                        VALIDATION AND RESULTS                      %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Validation and Evaluation}
+
+\subsection{Automated Tests}
+
+The project includes test suites for rules, moves, state transitions, game loop behavior, and search agents.
+
+\subsubsection{What is tested}
+
+\begin{table}[H]
+\centering
+\caption{Automated test coverage by module}
+\begin{tabularx}{\textwidth}{@{}p{0.25\textwidth}p{0.24\textwidth}X@{}}
+\toprule
+\textbf{Test file} & \textbf{Focus} & \textbf{Examples} \\\midrule
+\sys{tests/test_moves.py} & Move object correctness & capture flag, unpacking, immutability \\
+\sys{tests/test_rules.py} & Legal rules and terminal logic & horse-leg block, cannon screen, check/checkmate \\
+\sys{tests/test_state.py} & GameState consistency & apply/undo, clone independence, move history \\
+\sys{tests/test_game_loop.py} & Loop orchestration & turn order, illegal move rejection, mode flow \\
+\sys{tests/test_agents.py} & Search-agent behavior & legal move output for Easy/Medium/Hard/Minimax \\\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Step-by-step test procedure}
+
+\textbf{Step 1: Syntax validation}
+\begin{lstlisting}[language=bash, caption={Syntax check before running tests}]
+python -m py_compile main.py ui/game_ui.py agents/search_agent.py game/game_loop.py
+\end{lstlisting}
+Expected result: no output (success).
+
+\textbf{Step 2: Run full regression test suite}
+\begin{lstlisting}[language=bash, caption={Run all tests}]
+python -m unittest discover -s tests -p "test_*.py"
+\end{lstlisting}
+Expected result:
+\begin{lstlisting}[language={}]
+Ran 43 tests in <time>
+OK
+\end{lstlisting}
+
+\textbf{Step 3: Run focused search-agent tests}
+\begin{lstlisting}[language=bash, caption={Run search-agent tests only}]
+python -m unittest tests.test_agents
+\end{lstlisting}
+Expected result: all agent tests pass and returned moves are legal.
+
+\textbf{Step 4: Manual gameplay smoke test}
+\begin{lstlisting}[language=bash, caption={Start game UI}]
+python main.py
+\end{lstlisting}
+Checklist:
+\begin{itemize}
+  \item Switch among modes (Human vs AI, AI vs AI, AI vs Random).
+  \item Change levels and verify turn progression.
+  \item Confirm endgame banner appears (win/draw).
+  \item Confirm threefold repetition terminates looped positions.
+\end{itemize}
+
+\textbf{Step 5: Evaluation pipeline}
+\begin{lstlisting}[language=bash, caption={Run evaluation and export results}]
+python evaluation/evaluate.py
+\end{lstlisting}
+Expected result: summary printed in terminal, and JSON/CSV files generated in
+\sys{evaluation/results/}.
+
+\subsubsection{Benchmark protocol (reproducible)}
+
+For report/demo consistency, benchmarking should use a fixed protocol:
+\begin{enumerate}
+  \item Run paired-color matches (swap Red/Black roles) for fairness.
+  \item Keep fixed max-turn threshold to avoid infinite runs.
+  \item Record: winner, reason, plies, elapsed time.
+  \item Export one JSON and one CSV artifact per run.
+\end{enumerate}
+
+This protocol is implemented in \texttt{evaluation/evaluate.py}.
+
+\subsubsection{Current observed automated-test result}
+At the current project state, the full suite executes successfully:
+\begin{lstlisting}[language={}]
+...........................................
+----------------------------------------------------------------------
+Ran 43 tests in 115.334s
+
+OK
+\end{lstlisting}
+
+\subsection{Evaluation Script}
+
+The evaluation pipeline supports automated match batches and exports results to JSON/CSV\@.
+
+Example command:
+\begin{lstlisting}[language=bash, caption={Run evaluation script}]
+python evaluation/evaluate.py
+\end{lstlisting}
+
+Outputs are written to \texttt{evaluation/results/} for later analysis and demo reporting.
+
+\subsection{Observed Quantitative Signals}
+
+From the current implementation behavior:
+\begin{itemize}
+  \item Full regression testing is stable (43 tests pass).
+  \item Search-agent tests confirm all configured levels and both algorithms return legal moves.
+  \item Evaluation runs generate valid structured artifacts (JSON/CSV), enabling external analysis and charting.
+\end{itemize}
+
+Although many symmetric AI-vs-AI positions tend to end in draws (especially with repetition protection), this is expected in deterministic adversarial settings when both sides are similarly strong and tactical horizon is limited.
+
+\subsection{Detailed Test Strategy}
+
+To ensure reliability, testing is split into four layers:
+\begin{enumerate}
+  \item \textbf{Unit rule tests}: verify local chess rules and movement constraints.
+  \item \textbf{State-transition tests}: verify apply/undo and cloning consistency.
+  \item \textbf{Integration loop tests}: verify multi-agent interaction and turn execution.
+  \item \textbf{Scenario tests}: verify mode-specific behavior and terminal outcomes.
+\end{enumerate}
+
+\paragraph{Why this strategy is sufficient}
+Xiangqi errors usually come from either (i) illegal move generation, (ii) invalid turn transitions, or (iii) search selecting illegal states. The selected test layers directly target these failure classes.
+
+\subsection{Result Interpretation}
+
+\begin{itemize}
+  \item Passing \texttt{test\_rules.py} indicates core movement and check logic are stable.
+  \item Passing \texttt{test\_state.py} indicates state rollback and history are reliable for search.
+  \item Passing \texttt{test\_agents.py} indicates all AI levels/algorithms produce legal actions.
+  \item Passing \texttt{test\_game\_loop.py} indicates mode orchestration and game progression are correct.
+\end{itemize}
+
+Therefore, a full green suite gives strong confidence that gameplay, search, and orchestration are correct for Assignment 2 scope.
+
+\subsection{Failure Modes and Mitigations}
+
+Common practical issues and implemented mitigations:
+\begin{itemize}
+  \item \textbf{Looping behavior}: mitigated by threefold repetition draw handling.
+  \item \textbf{Slow deep search}: mitigated by Alpha-Beta pruning and move ordering.
+  \item \textbf{UI/backend mismatch}: mitigated by routing all move legality through backend validators.
+  \item \textbf{False tactical preference}: mitigated by large terminal utility scoring.
+\end{itemize}
+
+\subsection{Requirement Alignment}
+
+The implementation addresses assignment constraints:
+\begin{itemize}
+    \item Rule-correct Xiangqi gameplay.
+    \item Search-only AI methods (no machine learning).
+    \item Multiple AI levels and practical comparison modes.
+    \item Repeatable testing and evaluation scripts.
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                              CONCLUSION                            %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Conclusion}
+
+This Assignment 2 implementation demonstrates a complete search-based Xiangqi AI system with both depth search (Minimax) and heuristic search (Alpha-Beta). The project combines correct game modeling, practical agent design, and reproducible validation.
+
+Key outcomes:
+\begin{itemize}
+    \item A working adversarial Xiangqi engine with legal move control and terminal detection.
+    \item Distinct search strategies for comparative analysis.
+    \item Difficulty tiers suitable for demonstration and benchmarking.
+    \item A maintainable codebase with automated tests and evaluation outputs.
+\end{itemize}
+
+\paragraph{Future Work}
+Potential improvements beyond assignment scope:
+\begin{itemize}
+  \item Iterative deepening with time control per move.
+  \item Better tactical move ordering (checks, captures, threats).
+  \item Opening book and endgame table heuristics.
+  \item Richer benchmark dashboard from exported JSON/CSV results.
+\end{itemize}
+
+\end{document}

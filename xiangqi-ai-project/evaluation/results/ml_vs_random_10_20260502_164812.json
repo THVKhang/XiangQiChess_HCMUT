@@ -1,0 +1,106 @@
+{
+  "timestamp": "20260502_164812",
+  "total_games": 10,
+  "records": [
+    {
+      "matchup": "ML_vs_Random",
+      "game_index": 1,
+      "red_agent": "MLAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 85,
+      "elapsed_ms": 8486
+    },
+    {
+      "matchup": "Random_vs_ML",
+      "game_index": 2,
+      "red_agent": "RandomAgent",
+      "black_agent": "MLAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 87,
+      "elapsed_ms": 11101
+    },
+    {
+      "matchup": "ML_vs_Random",
+      "game_index": 3,
+      "red_agent": "MLAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 83,
+      "elapsed_ms": 13238
+    },
+    {
+      "matchup": "Random_vs_ML",
+      "game_index": 4,
+      "red_agent": "RandomAgent",
+      "black_agent": "MLAgent",
+      "winner": "draw",
+      "reason": "max_turns_reached",
+      "plies": 100,
+      "elapsed_ms": 11137
+    },
+    {
+      "matchup": "ML_vs_Random",
+      "game_index": 5,
+      "red_agent": "MLAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "stalemate",
+      "plies": 53,
+      "elapsed_ms": 6759
+    },
+    {
+      "matchup": "Random_vs_ML",
+      "game_index": 6,
+      "red_agent": "RandomAgent",
+      "black_agent": "MLAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 92,
+      "elapsed_ms": 9483
+    },
+    {
+      "matchup": "ML_vs_Random",
+      "game_index": 7,
+      "red_agent": "MLAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 59,
+      "elapsed_ms": 6559
+    },
+    {
+      "matchup": "Random_vs_ML",
+      "game_index": 8,
+      "red_agent": "RandomAgent",
+      "black_agent": "MLAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 87,
+      "elapsed_ms": 9793
+    },
+    {
+      "matchup": "ML_vs_Random",
+      "game_index": 9,
+      "red_agent": "MLAgent",
+      "black_agent": "RandomAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 74,
+      "elapsed_ms": 8103
+    },
+    {
+      "matchup": "Random_vs_ML",
+      "game_index": 10,
+      "red_agent": "RandomAgent",
+      "black_agent": "MLAgent",
+      "winner": "draw",
+      "reason": "threefold_repetition",
+      "plies": 63,
+      "elapsed_ms": 6992
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+matchup,game_index,red_agent,black_agent,winner,reason,plies,elapsed_ms
+ML_vs_Random,1,MLAgent,RandomAgent,draw,threefold_repetition,85,8486
+Random_vs_ML,2,RandomAgent,MLAgent,draw,threefold_repetition,87,11101
+ML_vs_Random,3,MLAgent,RandomAgent,draw,threefold_repetition,83,13238
+Random_vs_ML,4,RandomAgent,MLAgent,draw,max_turns_reached,100,11137
+ML_vs_Random,5,MLAgent,RandomAgent,draw,stalemate,53,6759
+Random_vs_ML,6,RandomAgent,MLAgent,draw,threefold_repetition,92,9483
+ML_vs_Random,7,MLAgent,RandomAgent,draw,threefold_repetition,59,6559
+Random_vs_ML,8,RandomAgent,MLAgent,draw,threefold_repetition,87,9793
+ML_vs_Random,9,MLAgent,RandomAgent,draw,threefold_repetition,74,8103
+Random_vs_ML,10,RandomAgent,MLAgent,draw,threefold_repetition,63,6992

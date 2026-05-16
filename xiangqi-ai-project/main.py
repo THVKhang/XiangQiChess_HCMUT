@@ -18,7 +18,6 @@ WINDOW_HEIGHT = 760
 FPS = 67
 
 
-<<<<<<< HEAD
 def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
     level_map = {
         "Easy": EasyAgent,
@@ -188,6 +187,7 @@ def main():
                 width, height = event.w, event.h
                 screen = pygame.display.set_mode((width, height), pygame.RESIZABLE)
                 game_ui.resize(width, height)
+                menu.resize(width, height)
 
             if app_state == "menu":
                 action = menu.handle_event(event)

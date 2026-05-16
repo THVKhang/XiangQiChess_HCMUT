@@ -61,7 +61,7 @@ class GameUI:
         self.state = None
         self.piece_images = {}
         self.piece_themes = ["classic", "flat", "wood"]
-        self.piece_theme_index = 0
+        self.piece_theme_index = 2
         self.piece_theme = self.piece_themes[self.piece_theme_index]
         self.cjk_font_candidates = [
             "Microsoft YaHei",
@@ -910,6 +910,7 @@ class GameUI:
         if self.animating_piece is not None:
             anim = self.animating_piece
             t = min(1.0, anim["elapsed"] / anim["duration"])
+            t = 1.0 - (1.0 - t) * (1.0 - t)  # Ease-out quadratic
             sx, sy = anim["from"]
             ex, ey = anim["to"]
             ax = int(sx + (ex - sx) * t)
@@ -1063,7 +1064,12 @@ class GameUI:
         y += 6
         y, ok = self.render_text_lines(screen, "Status:", self.text_font, palette["info_text"], x, y, max_text_w, text_bottom_limit)
         if ok:
-            self.render_text_lines(screen, self.status_message, self.small_font, palette["status_text"], x, y, max_text_w, text_bottom_limit)
+            if self.status_message == "AI is thinking...":
+                dots = "." * ((self.ui_time_ms // 300) % 4)
+                msg = f"AI is thinking{dots}"
+            else:
+                msg = self.status_message
+            self.render_text_lines(screen, msg, self.small_font, palette["status_text"], x, y, max_text_w, text_bottom_limit)
 
         # Optional move history if there is space
         hist_top = min(self.undo_button.top - 8, text_bottom_limit)

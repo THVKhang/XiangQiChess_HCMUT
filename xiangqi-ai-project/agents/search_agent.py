@@ -8,7 +8,8 @@ from core.move import Move
 from core.rules import Color, PieceType, on_own_side_of_river
 
 MATE_SCORE = 1_000_000
-BACKTRACK_PENALTY = 1_500
+BACKTRACK_PENALTY = 5_000
+CYCLE_PENALTY = 8_000
 
 # Bảng giá trị cơ bản của các quân cờ
 PIECE_VALUES = {
@@ -39,47 +40,126 @@ def basic_evaluate(state: GameState, player_id):
 
 def advanced_evaluate(state: GameState, player_id):
     """
-    Hàm lượng giá nâng cao (Heuristic bản 2: Giá trị quân + Vị trí chiến lược)
+    Hàm lượng giá nâng cao v3: Ưu tiên phát triển Xe, Pháo, Mã.
+    Xe (Rook) là quân mạnh nhất → cần được phát triển sớm và xâm nhập.
+    Pháo (Cannon) cần giá ngắm (screen) để tấn công hiệu quả.
+    Mã (Horse) cần ra khỏi biên và tiến về trung tâm sân đối phương.
     """
     score = 0
+    
+    # Đếm số quân trên mỗi cột (dùng cho Xe đánh giá cột mở)
+    col_piece_count = [0] * 9
+    for pos, piece in state.board.squares():
+        if piece is not None:
+            col_piece_count[pos[1]] += 1
+    
     for pos, piece in state.board.squares():
         if piece is None:
             continue
         
         r, c = pos
         val = PIECE_VALUES.get(piece.kind, 0)
+        across_river = not on_own_side_of_river(piece.color, pos)
         
-        # 1. Tốt (Pawn)
-        if piece.kind == PieceType.SOLDIER:
-            if not on_own_side_of_river(piece.color, pos):
-                val += 100  # Tốt qua sông
-                # Thưởng nếu áp sát cung Tướng địch nhưng chưa bị lụt (xuống đáy)
-                # Đỏ đi từ hàng 9 -> 0, Đen đi từ 0 -> 9
+        # ═══ XE (ROOK) - Quân mạnh nhất, cần được ưu tiên phát triển ═══
+        if piece.kind == PieceType.ROOK:
+            # Xe ở cột mở (ít quân cản) → cực mạnh
+            if col_piece_count[c] <= 3:
+                val += 80  # Cột mở
+            elif col_piece_count[c] <= 5:
+                val += 40  # Cột nửa mở
+                
+            # Xe qua sông → đang tấn công trực tiếp
+            if across_river:
+                val += 120
+                # Xe xâm nhập sâu vào cung Tướng địch
                 if piece.color == Color.RED:
-                    if 1 <= r <= 2 and 3 <= c <= 5: val += 50
-                    elif r == 0: val -= 30
+                    if r <= 2: val += 80   # Xe đỏ xâm nhập hàng 0-2 (gần Tướng đen)
+                    if r <= 1 and 3 <= c <= 5: val += 60  # Xe đỏ ngay cung Tướng đen
                 else:
-                    if 7 <= r <= 8 and 3 <= c <= 5: val += 50
-                    elif r == 9: val -= 30
+                    if r >= 7: val += 80   # Xe đen xâm nhập hàng 7-9
+                    if r >= 8 and 3 <= c <= 5: val += 60
+            else:
+                # Xe chưa ra quân (vẫn ở góc ban đầu) → phạt
+                if piece.color == Color.RED and r == 9 and c in (0, 8):
+                    val -= 60  # Xe đỏ còn nguyên vị trí xuất phát
+                elif piece.color == Color.BLACK and r == 0 and c in (0, 8):
+                    val -= 60
                     
-        # 2. Mã (Horse)
-        elif piece.kind == PieceType.HORSE:
-            if c == 0 or c == 8: val -= 20   # Mã biên bị giới hạn
-            elif 3 <= c <= 5: val += 20      # Mã trung tâm mạnh hơn
+            # Xe ở hàng 7 (Đỏ) hoặc hàng 2 (Đen) - tương tự "7th rank" trong chess
+            if piece.color == Color.RED and r == 2:
+                val += 50
+            elif piece.color == Color.BLACK and r == 7:
+                val += 50
 
-        # 3. Pháo (Cannon)
+        # ═══ PHÁO (CANNON) - Cần giá ngắm để chiếu/ăn quân ═══
         elif piece.kind == PieceType.CANNON:
-            if c == 4: val += 30             # Pháo khống chế lộ giữa nguy hiểm
-
-        # 4. Xe (Rook)
-        elif piece.kind == PieceType.ROOK:
-            if c in (2, 4, 6): val += 15     # Xe đóng ở các trục quan trọng
+            # Pháo ở trục giữa rất nguy hiểm
+            if c == 4: val += 40
+            # Pháo ở cột 1 hoặc 7 (trục pháo cổ điển)
+            elif c in (1, 7): val += 25
             
-        # 5. Tướng và Sĩ, Tượng phòng thủ
+            # Pháo qua sông → đang tấn công
+            if across_river:
+                val += 60
+                # Pháo áp sát cung tướng
+                if piece.color == Color.RED and r <= 2 and 3 <= c <= 5:
+                    val += 50
+                elif piece.color == Color.BLACK and r >= 7 and 3 <= c <= 5:
+                    val += 50
+            
+            # Pháo ở biên kém hiệu quả
+            if c == 0 or c == 8:
+                val -= 20
+                
+        # ═══ MÃ (HORSE) - Cần phát triển ra khỏi biên ═══
+        elif piece.kind == PieceType.HORSE:
+            # Mã ở biên cực kém
+            if c == 0 or c == 8: val -= 40
+            # Mã ở trung tâm mạnh
+            elif 3 <= c <= 5: val += 30
+            
+            # Mã qua sông → đang tấn công
+            if across_river:
+                val += 70
+                # Mã ngay gần cung tướng địch (outpost)
+                if piece.color == Color.RED:
+                    if r <= 2 and 3 <= c <= 5: val += 60
+                else:
+                    if r >= 7 and 3 <= c <= 5: val += 60
+            else:
+                # Mã chưa phát triển (vẫn ở vị trí ban đầu)
+                if piece.color == Color.RED and r == 9 and c in (1, 7):
+                    val -= 30
+                elif piece.color == Color.BLACK and r == 0 and c in (1, 7):
+                    val -= 30
+                    
+        # ═══ TỐT (SOLDIER) - Chỉ mạnh khi qua sông ═══
+        elif piece.kind == PieceType.SOLDIER:
+            if across_river:
+                val += 80  # Tốt qua sông (giảm từ 100 xuống 80 để không lấn át Xe/Pháo)
+                if piece.color == Color.RED:
+                    if 1 <= r <= 2 and 3 <= c <= 5: val += 40
+                    elif r == 0: val -= 30  # Tốt chạm đáy mất giá
+                else:
+                    if 7 <= r <= 8 and 3 <= c <= 5: val += 40
+                    elif r == 9: val -= 30
+
+        # ═══ TƯỚNG (GENERAL) ═══
         elif piece.kind == PieceType.GENERAL:
-            if c != 4: val -= 20             # Tướng rời khỏi trục 4 rất nguy hiểm
-        elif piece.kind in (PieceType.ADVISOR, PieceType.ELEPHANT):
-            if c == 4: val += 10             # Thường tụ về giữa cung để bảo vệ
+            if c != 4: val -= 30  # Tướng rời trục giữa nguy hiểm
+            # Tướng ở hàng cuối an toàn hơn
+            if piece.color == Color.RED:
+                if r < 8: val -= 40  # Tướng đỏ tiến lên quá = nguy hiểm
+            else:
+                if r > 1: val -= 40
+                
+        # ═══ SĨ + TƯỢNG (phòng thủ) ═══
+        elif piece.kind == PieceType.ADVISOR:
+            if c == 4: val += 15   # Sĩ ở giữa cung bảo vệ tốt
+        elif piece.kind == PieceType.ELEPHANT:
+            if c == 4: val += 10
+            # Tượng mất = cung Tướng yếu
             
         if piece.color == player_id:
             score += val
@@ -106,11 +186,26 @@ def terminal_utility(state: GameState, player_id, depth: int) -> int:
 
 
 def is_simple_backtrack(state: GameState, move: Move) -> bool:
-    """Phạt nhẹ nước đi quay đầu đúng kiểu vừa đi xong rồi đi lại chỗ cũ ở lượt kế tiếp của chính mình."""
+    """Phạt nước đi quay đầu (A->B rồi B->A) ở lượt kế tiếp của chính mình."""
     if len(state.move_history) < 2:
         return False
     last_own = state.move_history[-2]
     return last_own.src == move.dst and last_own.dst == move.src
+
+
+def is_cycle_move(state: GameState, move: Move) -> bool:
+    """Phát hiện chu trình 4 nước (A->B->C->D->A) gây lặp vị trí."""
+    history = state.move_history
+    if len(history) < 4:
+        return False
+    # Nếu nước đi hiện tại quay về đúng vị trí bắt đầu của 4 nước trước
+    own_prev = history[-2]  # lần đi trước của mình
+    opp_prev = history[-1]  # lần đi trước của đối thủ 
+    own_prev2 = history[-4] if len(history) >= 4 else None  # 2 lần trước của mình
+    if own_prev2 is not None:
+        if move.dst == own_prev2.src and move.src == own_prev.dst:
+            return True
+    return False
 
 
 class MinimaxAgent(BaseAgent):
@@ -143,6 +238,8 @@ class MinimaxAgent(BaseAgent):
 
             if is_simple_backtrack(state, move):
                 score -= BACKTRACK_PENALTY
+            if is_cycle_move(state, move):
+                score -= CYCLE_PENALTY
             
             if score > best_score:
                 best_score = score
@@ -199,15 +296,35 @@ class AlphaBetaAgent(BaseAgent):
             return moves
             
         def move_score(move):
+            score = 0
             target_piece = state.board.get(move.dst)
+            attacker_piece = state.board.get(move.src)
+            
             if target_piece is not None:
                 # MVV-LVA: Most Valuable Victim - Least Valuable Attacker
-                # Ưu tiên bắt quân to bằng quân nhỏ (VD: Tốt ăn Xe ngon hơn Xe ăn Xe)
-                attacker_piece = state.board.get(move.src)
                 attacker_val = PIECE_VALUES.get(attacker_piece.kind, 0) if attacker_piece else 0
                 target_val = PIECE_VALUES.get(target_piece.kind, 0)
-                return 10000 + target_val - attacker_val
-            return 0
+                score += 10000 + target_val - attacker_val
+            
+            # Ưu tiên di chuyển quân mạnh (Xe > Pháo > Mã) ngay cả khi không ăn quân
+            if attacker_piece is not None:
+                if attacker_piece.kind == PieceType.ROOK:
+                    score += 200  # Xe cần được phát triển đầu tiên
+                    # Thưởng thêm nếu Xe đang tiến về phía đối phương
+                    if not on_own_side_of_river(attacker_piece.color, move.dst):
+                        score += 100
+                elif attacker_piece.kind == PieceType.CANNON:
+                    score += 150
+                    if not on_own_side_of_river(attacker_piece.color, move.dst):
+                        score += 80
+                elif attacker_piece.kind == PieceType.HORSE:
+                    score += 120
+                    if not on_own_side_of_river(attacker_piece.color, move.dst):
+                        score += 80
+                elif attacker_piece.kind == PieceType.SOLDIER:
+                    score += 10  # Tốt ưu tiên thấp nhất
+                    
+            return score
             
         return sorted(moves, key=move_score, reverse=True)
 
@@ -235,6 +352,8 @@ class AlphaBetaAgent(BaseAgent):
 
             if is_simple_backtrack(state, move):
                 score -= BACKTRACK_PENALTY
+            if is_cycle_move(state, move):
+                score -= CYCLE_PENALTY
             
             if score > best_score:
                 best_score = score
