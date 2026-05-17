@@ -1,0 +1,87 @@
+% Chapter 2: Cơ sở lý thuyết
+\section{Cơ sở lý thuyết}
+
+\subsection{Trò chơi đối kháng và Không gian trạng thái}
+Cờ Tướng thuộc lớp \textit{trò chơi đối kháng hai người, thông tin hoàn hảo, tổng bằng không} (two-player, perfect information, zero-sum game). Mỗi trạng thái bàn cờ được biểu diễn bởi:
+\begin{itemize}
+    \item Vị trí của 32 quân cờ trên bàn $10 \times 9$
+    \item Phe hiện tại được đi (Đỏ hoặc Đen)
+    \item Lịch sử nước đi (để phát hiện lặp)
+\end{itemize}
+
+Số nước đi hợp lệ trung bình mỗi lượt (branching factor) khoảng 30--40, với độ sâu trung bình 80--120 nước, tạo ra cây trò chơi cực kỳ lớn.
+
+\subsection{Luật chơi Cờ Tướng}
+
+\subsubsection{Bàn cờ và quân cờ}
+Bàn cờ gồm 90 giao điểm ($10 \times 9$), chia bởi ``Sông'' (楚河漢界) ở giữa. Mỗi bên có 16 quân:
+\begin{table}[H]
+\centering
+\caption{Các loại quân cờ trong Cờ Tướng}
+\begin{tabular}{llccl}
+\toprule
+\textbf{Quân} & \textbf{Hán tự (Đỏ/Đen)} & \textbf{Số lượng} & \textbf{Giá trị} & \textbf{Đặc điểm} \\
+\midrule
+Tướng (General) & 帥 / 將 & 1 & Vô hạn & Di chuyển 1 ô, trong cung \\
+Sĩ (Advisor) & 仕 / 士 & 2 & 200 & Đi chéo 1 ô, trong cung \\
+Tượng (Elephant) & 相 / 象 & 2 & 200 & Đi chéo 2 ô, không qua sông \\
+Mã (Horse) & 傌 / 馬 & 2 & 400 & Đi chữ L, bị cản chân \\
+Xe (Rook) & 俥 / 車 & 2 & 900 & Đi thẳng không giới hạn \\
+Pháo (Cannon) & 炮 / 砲 & 2 & 450 & Đi thẳng, ăn cần giá ngắm \\
+Tốt (Soldier) & 兵 / 卒 & 5 & 100 & Tiến 1 ô, qua sông đi ngang \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Các luật đặc biệt}
+\begin{itemize}
+    \item \textbf{Đối mặt Tướng}: Hai Tướng không được đứng cùng cột mà không có quân nào chắn.
+    \item \textbf{Chiếu bí (Checkmate)}: Tướng bị chiếu và không có nước giải --- thua.
+    \item \textbf{Hết nước (Stalemate)}: Không bị chiếu nhưng hết nước đi hợp lệ --- hòa.
+    \item \textbf{Lặp vị trí (Threefold Repetition)}: Cùng vị trí xuất hiện 3 lần --- hòa.
+\end{itemize}
+
+\subsection{Thuật toán tìm kiếm trò chơi}
+
+\subsubsection{Minimax}
+Thuật toán Minimax duyệt toàn bộ cây trò chơi đến độ sâu $d$, giả định cả hai bên chơi tối ưu:
+\begin{equation}
+    \text{minimax}(s) = \begin{cases}
+        \text{eval}(s) & \text{nếu } s \text{ là terminal hoặc } d = 0 \\
+        \max_{a} \text{minimax}(\text{result}(s, a)) & \text{nếu player}(s) = \text{MAX} \\
+        \min_{a} \text{minimax}(\text{result}(s, a)) & \text{nếu player}(s) = \text{MIN}
+    \end{cases}
+\end{equation}
+
+Độ phức tạp: $O(b^d)$ với $b \approx 35$ (branching factor) và $d$ là độ sâu tìm kiếm.
+
+\subsubsection{Alpha-Beta Pruning}
+Cải tiến Minimax bằng cách cắt tỉa các nhánh không thể ảnh hưởng kết quả, giảm số nút duyệt từ $O(b^d)$ xuống $O(b^{d/2})$ trong trường hợp tốt nhất.
+
+\subsubsection{Transposition Table}
+Bảng chuyển vị lưu trữ kết quả đã tính cho các trạng thái đã duyệt, tránh tính toán lặp. Mỗi entry lưu: giá trị, cờ (EXACT/LOWERBOUND/UPPERBOUND), và độ sâu.
+
+\subsection{Mạng Nơ-ron Tích chập (CNN)}
+CNN được thiết kế để xử lý dữ liệu có cấu trúc lưới (grid-like), phù hợp với bàn cờ $10 \times 9$.
+
+\subsubsection{Residual Network (ResNet)}
+ResNet giải quyết vấn đề vanishing gradient qua \textit{skip connections}:
+\begin{equation}
+    \mathbf{y} = F(\mathbf{x}, \{W_i\}) + \mathbf{x}
+\end{equation}
+trong đó $F$ là hàm residual (2 lớp Conv + BatchNorm), và $\mathbf{x}$ là input gốc.
+
+\subsubsection{Dual-Head Architecture (AlphaZero-style)}
+Kiến trúc gồm:
+\begin{itemize}
+    \item \textbf{Backbone}: Chuỗi Residual Blocks chia sẻ đặc trưng
+    \item \textbf{Policy Head}: Dự đoán xác suất nước đi tốt nhất ($\pi \in \mathbb{R}^{8100}$)
+    \item \textbf{Value Head}: Đánh giá vị trí hiện tại ($v \in [-1, 1]$)
+\end{itemize}
+
+\subsection{Reward Shaping trong Reinforcement Learning}
+Reward shaping bổ sung tín hiệu thưởng/phạt phụ vào hàm phần thưởng gốc để hướng dẫn agent học nhanh hơn. Trong đồ án, capture bonus (thưởng khi ăn quân) là dạng reward shaping:
+\begin{equation}
+    r'(s, a) = r(s, a) + \phi(s, a)
+\end{equation}
+với $\phi(s, a)$ là bonus dựa trên giá trị quân bị ăn.

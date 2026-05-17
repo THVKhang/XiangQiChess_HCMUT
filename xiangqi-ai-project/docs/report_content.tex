@@ -1,0 +1,59 @@
+% ============================================================
+% BÁO CÁO ĐỒ ÁN: XIANGQI AI - CỜ TƯỚNG TRÍ TUỆ NHÂN TẠO
+% Trường Đại học Bách khoa TP.HCM (HCMUT)
+% ============================================================
+% Sử dụng: \input{report_content.tex} sau trang bìa
+
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray},
+  stringstyle=\color{red},
+  numbers=left, numberstyle=\tiny\color{gray},
+  breaklines=true, frame=single,
+  captionpos=b
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Xiangqi AI -- HCMUT}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+\input{chapters/ch1_introduction}
+\input{chapters/ch2_background}
+\input{chapters/ch3_architecture}
+\input{chapters/ch4_ml_agent}
+\input{chapters/ch5_search_agent}
+\input{chapters/ch6_evaluation}
+\input{chapters/ch7_ui}
+\input{chapters/ch8_conclusion}

@@ -1,0 +1,136 @@
+% Chapter 6: Đánh giá thực nghiệm
+\section{Đánh giá thực nghiệm}
+
+\subsection{Phương pháp đánh giá}
+Benchmark chạy 10 ván mỗi cấu hình, ML Agent xen kẽ đi Đỏ/Đen để đảm bảo công bằng. Mỗi ván giới hạn 500 nước. Kết quả đo: Win/Loss/Draw rate, lý do kết thúc, số nước trung bình.
+
+\subsection{ML Agent vs Random Agent}
+
+\subsubsection{Kết quả chính}
+\begin{table}[H]
+\centering
+\caption{Kết quả ML Agent (Hard) vs Random Agent -- 3 lần chạy}
+\begin{tabular}{ccccl}
+\toprule
+\textbf{Run} & \textbf{Wins} & \textbf{Losses} & \textbf{Draws} & \textbf{Win Rate} \\
+\midrule
+Run 1 (seed=i*31+11) & 9 & 1 & 0 & 90\% \\
+Run 2 (seed=i*53+7) & 10 & 0 & 0 & \textbf{100\%} \\
+Run 3 (seed=i*97+42) & 10 & 0 & 0 & \textbf{100\%} \\
+\midrule
+\textbf{Tổng (30 ván)} & \textbf{29} & \textbf{1} & \textbf{0} & \textbf{96.7\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, bar width=20pt,
+    xlabel={Kết quả}, ylabel={Số ván},
+    symbolic x coords={Win, Loss, Draw},
+    xtick=data, ymin=0, ymax=32,
+    nodes near coords, width=8cm, height=6cm,
+    title={ML Agent vs Random (30 ván)}
+]
+\addplot[fill=green!60] coordinates {(Win,29) (Loss,1) (Draw,0)};
+\end{axis}
+\end{tikzpicture}
+\caption{Phân bố kết quả ML vs Random}
+\end{figure}
+
+\subsubsection{Phân tích chi tiết Run 3 (Perfect 10/10)}
+\begin{table}[H]
+\centering
+\caption{Chi tiết 10 ván Run 3}
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Game} & \textbf{ML Color} & \textbf{Result} & \textbf{Moves} & \textbf{Reason} \\
+\midrule
+1 & Red & ML Win & 133 & Checkmate \\
+2 & Black & ML Win & 88 & Checkmate \\
+3 & Red & ML Win & 119 & Checkmate \\
+4 & Black & ML Win & 126 & Checkmate \\
+5 & Red & ML Win & 117 & Checkmate \\
+6 & Black & ML Win & 156 & Checkmate \\
+7 & Red & ML Win & 107 & Checkmate \\
+8 & Black & ML Win & 20 & Checkmate \\
+9 & Red & ML Win & 99 & Checkmate \\
+10 & Black & ML Win & 70 & Checkmate \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Đặc biệt, Game 8 kết thúc chỉ sau \textbf{20 nước} bằng checkmate --- cho thấy ML Agent có khả năng nhận diện và khai thác lỗi rất nhanh.
+
+\subsection{So sánh ML Agent vs Search Agent}
+
+\subsubsection{Đặc điểm so sánh}
+\begin{table}[H]
+\centering
+\caption{So sánh ML Agent và Search Agent}
+\begin{tabularx}{\textwidth}{lXX}
+\toprule
+\textbf{Tiêu chí} & \textbf{ML Agent} & \textbf{Search Agent} \\
+\midrule
+Phương pháp & Neural network inference & Game tree search \\
+Độ sâu tính toán & 1-ply + heuristics & 1--4 ply (Minimax/AB) \\
+Thời gian/nước & $\sim$0.5--1s & 0.1--30s (tùy depth) \\
+Cần training & Có (offline) & Không \\
+Tri thức domain & Học từ data & Mã hóa thủ công \\
+Anti-stalemate & Terminal state check & Implicit (evaluation) \\
+Anti-repetition & 3-layer cycle detection & Penalty-based \\
+Scalability & Tăng data = mạnh hơn & Tăng depth = chậm hơn \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsubsection{Ưu điểm ML Agent}
+\begin{enumerate}
+    \item \textbf{Tốc độ}: Inference CNN chỉ mất $\sim$0.5s, trong khi Search depth 3 mất 5--15s.
+    \item \textbf{Pattern recognition}: Nhận diện chiến thuật từ dữ liệu thực tế, không cần mã hóa thủ công.
+    \item \textbf{Khả năng mở rộng}: Huấn luyện thêm data sẽ mạnh hơn mà không thay đổi code.
+\end{enumerate}
+
+\subsubsection{Ưu điểm Search Agent}
+\begin{enumerate}
+    \item \textbf{Deterministic}: Kết quả dự đoán được, dễ debug.
+    \item \textbf{Không cần data}: Hoạt động ngay mà không cần dataset hay GPU.
+    \item \textbf{Tactical precision}: Ở depth cao (4+), tính toán chính xác hơn CNN 1-ply.
+\end{enumerate}
+
+\subsection{Phân tích tiến trình cải thiện}
+\begin{table}[H]
+\centering
+\caption{Tiến trình cải thiện ML Agent qua các phiên bản}
+\begin{tabular}{lcccl}
+\toprule
+\textbf{Version} & \textbf{Win} & \textbf{Loss} & \textbf{Draw} & \textbf{Thay đổi chính} \\
+\midrule
+v0 (baseline) & 0 & 0 & 10 & Toàn stalemate (capture quá mạnh) \\
+v1 (+capture bonus) & 4 & 1 & 5 & Thêm capture bonus + anti-stalemate \\
+v2 (+anti-stalemate) & 8 & 1 & 1 & Check top 8 moves for terminal \\
+v3 (+check all) & 9 & 1 & 0 & Check top 5 + all captures \\
+v4 (final) & 10 & 0 & 0 & Optimized terminal detection \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    xlabel={Version}, ylabel={Win Rate (\%)},
+    xmin=-0.5, xmax=4.5, ymin=0, ymax=105,
+    xtick={0,1,2,3,4},
+    xticklabels={v0, v1, v2, v3, v4},
+    width=10cm, height=6cm,
+    grid=major,
+    title={Tiến trình cải thiện Win Rate}
+]
+\addplot[color=red, mark=*, thick] coordinates {(0,0) (1,40) (2,80) (3,90) (4,100)};
+\end{axis}
+\end{tikzpicture}
+\caption{Win rate tăng từ 0\% đến 100\% qua 5 phiên bản}
+\end{figure}

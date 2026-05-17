@@ -1,0 +1,28 @@
+% Chapter 1: Giới thiệu
+\section{Giới thiệu}
+
+\subsection{Bối cảnh đề tài}
+Cờ Tướng (Xiangqi) là một trong những trò chơi chiến lược lâu đời nhất thế giới, có nguồn gốc từ Trung Quốc với hơn 1.000 năm lịch sử. Trò chơi được thực hiện trên bàn cờ $10 \times 9$ với 32 quân cờ, chia đều cho hai phe Đỏ và Đen. Với không gian trạng thái ước tính khoảng $10^{48}$ --- lớn hơn cả cờ Vua quốc tế ($10^{44}$) --- Cờ Tướng đặt ra thách thức đáng kể cho các phương pháp trí tuệ nhân tạo.
+
+Trong những năm gần đây, sự thành công của AlphaZero (DeepMind, 2017) đã chứng minh rằng các phương pháp Machine Learning thuần túy, đặc biệt là Deep Reinforcement Learning kết hợp với mạng nơ-ron tích chập (CNN), có khả năng đạt trình độ siêu nhân trong các trò chơi đối kháng mà không cần tri thức chuyên gia thủ công.
+
+\subsection{Mục tiêu đồ án}
+Đồ án này nhằm:
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Xây dựng ML Agent}: Thiết kế và huấn luyện một agent dựa hoàn toàn trên Machine Learning (mạng CNN dual-head: Policy + Value) để chơi Cờ Tướng theo đúng luật.
+    \item \textbf{Đánh bại Random Agent}: Agent phải thắng 10/10 ván khi đấu với Random Agent, bất kể đi trước hay đi sau.
+    \item \textbf{Nhiều mức độ khó}: Agent có các mức Easy -- Medium -- Hard (tương ứng level 1--10).
+    \item \textbf{So sánh ML vs Search}: Đánh giá hiệu quả giữa phương pháp ML thuần túy và thuật toán tìm kiếm (Minimax, Alpha-Beta Pruning).
+    \item \textbf{Giao diện người dùng}: Xây dựng GUI bằng Pygame với phong cách cờ tướng cổ điển.
+\end{enumerate}
+
+\subsection{Phạm vi đồ án}
+\begin{itemize}
+    \item \textbf{Game}: Cờ Tướng Trung Quốc (Chinese Chess / Xiangqi) với đầy đủ luật chơi.
+    \item \textbf{Framework ML}: PyTorch cho mạng nơ-ron, HDF5 cho lưu trữ dữ liệu.
+    \item \textbf{Dataset}: Chinese Chess Practical Dataset (CCPD) --- 427MB dữ liệu ván cờ thực tế.
+    \item \textbf{UI}: Pygame với giao diện cờ tướng truyền thống, hỗ trợ chữ Hán.
+\end{itemize}
+
+\subsection{Cấu trúc báo cáo}
+Báo cáo gồm 8 chương: Giới thiệu, Cơ sở lý thuyết, Kiến trúc hệ thống, ML Agent, Search Agent, Đánh giá thực nghiệm, Giao diện người dùng, và Kết luận.

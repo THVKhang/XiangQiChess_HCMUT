@@ -1,0 +1,77 @@
+% Chapter 7: Giao diện người dùng
+\section{Giao diện người dùng}
+
+\subsection{Công nghệ sử dụng}
+Giao diện được xây dựng bằng \textbf{Pygame} với phong cách cờ tướng Trung Quốc cổ điển:
+\begin{itemize}
+    \item Bàn cờ gỗ nâu ấm với vân gỗ tinh tế
+    \item Quân cờ tròn truyền thống với viền đôi và chữ Hán
+    \item Hoa tinh (star points) tại vị trí Pháo và Tốt
+    \item Sông ``楚河漢界'' giữa bàn cờ
+    \item Animation mượt khi di chuyển quân
+\end{itemize}
+
+\subsection{Các tính năng chính}
+
+\subsubsection{Chế độ chơi (Menu)}
+\begin{enumerate}
+    \item \textbf{Human vs AI}: Người chơi Đỏ, AI chơi Đen
+    \item \textbf{AI vs Random}: Search/ML Agent vs Random Agent
+    \item \textbf{AI vs AI}: Hai AI đấu với nhau
+    \item \textbf{ML vs Random}: ML Agent vs Random Agent
+    \item \textbf{Human vs Human}: Hai người chơi
+\end{enumerate}
+
+\subsubsection{Tương tác bàn cờ}
+\begin{itemize}
+    \item Click chọn quân → hiển thị nước đi hợp lệ (chấm xanh)
+    \item Click ô đích để di chuyển, có animation trượt
+    \item Highlight nước đi cuối (vòng tròn vàng)
+    \item Hover effect khi rê chuột
+    \item Pulse animation khi chọn quân
+\end{itemize}
+
+\subsubsection{Dashboard bên phải}
+\begin{itemize}
+    \item Hiển thị chế độ chơi và mức độ khó
+    \item Thông tin AI (thuật toán, depth, heuristic)
+    \item Lịch sử nước đi (move history)
+    \item Nút: Reset, Undo, New Game, Menu, Fullscreen, Piece Theme
+\end{itemize}
+
+\subsection{Thiết kế quân cờ cổ điển}
+Quân cờ được vẽ theo phong cách truyền thống:
+\begin{itemize}
+    \item Nền tròn màu kem ($248, 235, 210$)
+    \item Viền ngoài đậm (đỏ sẫm hoặc đen)
+    \item Viền trong trang trí (inner ring)
+    \item Chữ Hán in đậm ở giữa
+    \item Bóng đổ và gloss highlight tạo chiều sâu 3D
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Chữ Hán trên quân cờ}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Quân} & \textbf{Đỏ (帥方)} & \textbf{Đen (將方)} \\
+\midrule
+Tướng & 帥 & 將 \\
+Sĩ & 仕 & 士 \\
+Tượng & 相 & 象 \\
+Mã & 傌 & 馬 \\
+Xe & 俥 & 車 \\
+Pháo & 炮 & 砲 \\
+Tốt & 兵 & 卒 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Responsive Design}
+UI tự động điều chỉnh kích thước dựa trên cửa sổ:
+\begin{itemize}
+    \item Cell size tự tính theo min(width, height)
+    \item Font size scale theo cell size
+    \item Dashboard panel tự co giãn
+    \item Hỗ trợ fullscreen (F11)
+\end{itemize}

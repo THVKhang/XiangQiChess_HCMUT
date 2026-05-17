@@ -1,0 +1,115 @@
+% Chapter 5: Search Agent
+\section{Search Agent -- Phương pháp Tìm kiếm}
+
+\subsection{Tổng quan}
+Search Agent sử dụng các thuật toán tìm kiếm cây trò chơi cổ điển để chọn nước đi. Hệ thống cung cấp 3 thuật toán với 10 cấp độ từ yếu đến mạnh.
+
+\subsection{MinimaxAgent}
+
+\subsubsection{Cài đặt}
+Agent duyệt toàn bộ cây trò chơi đến độ sâu $d$, sử dụng hàm lượng giá tại các nút lá:
+
+\begin{algorithm}[H]
+\caption{Minimax Search}
+\begin{algorithmic}[1]
+\Function{Minimax}{$state, depth, isMax$}
+    \If{$depth = 0$ or $state$ is terminal}
+        \State \Return evaluate($state$)
+    \EndIf
+    \If{$isMax$}
+        \State $best \leftarrow -\infty$
+        \For{each move $m$ in legal\_moves($state$)}
+            \State $score \leftarrow$ \Call{Minimax}{apply($state$, $m$), $depth-1$, False}
+            \State $best \leftarrow \max(best, score)$
+        \EndFor
+    \Else
+        \State $best \leftarrow +\infty$
+        \For{each move $m$ in legal\_moves($state$)}
+            \State $score \leftarrow$ \Call{Minimax}{apply($state$, $m$), $depth-1$, True}
+            \State $best \leftarrow \min(best, score)$
+        \EndFor
+    \EndIf
+    \State \Return $best$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{AlphaBetaAgent}
+
+\subsubsection{Alpha-Beta Pruning}
+Cải tiến Minimax bằng cách duy trì hai biên:
+\begin{itemize}
+    \item $\alpha$: giá trị tốt nhất MAX đã đảm bảo được
+    \item $\beta$: giá trị tốt nhất MIN đã đảm bảo được
+    \item Cắt tỉa khi $\alpha \geq \beta$
+\end{itemize}
+
+\subsubsection{Move Ordering (MVV-LVA)}
+Sắp xếp nước đi theo heuristic để cắt tỉa hiệu quả hơn:
+\begin{equation}
+    \text{score}(m) = \begin{cases}
+        10000 + V_{\text{victim}} - V_{\text{attacker}} & \text{nếu } m \text{ là capture} \\
+        200 & \text{nếu quân đi là Xe} \\
+        150 & \text{nếu quân đi là Pháo} \\
+        120 & \text{nếu quân đi là Mã}
+    \end{cases}
+\end{equation}
+Bonus thêm nếu quân di chuyển qua sông (xâm nhập lãnh thổ đối phương).
+
+\subsubsection{Transposition Table}
+Bảng băm lưu kết quả đã tính:
+\begin{lstlisting}[caption=Cấu trúc Transposition Table entry]
+key = (state_hash, depth, is_maximizing)
+entry = {
+    'value': best_score,
+    'flag': 'EXACT' | 'LOWERBOUND' | 'UPPERBOUND'
+}
+\end{lstlisting}
+
+\subsection{Hàm lượng giá (Evaluation Function)}
+
+\subsubsection{Basic Evaluate}
+Chỉ dựa vào tổng giá trị quân:
+\begin{equation}
+    \text{eval}(s) = \sum_{p \in \text{my\_pieces}} V(p) - \sum_{p \in \text{opp\_pieces}} V(p)
+\end{equation}
+
+\subsubsection{Advanced Evaluate}
+Bổ sung các yếu tố chiến thuật:
+\begin{itemize}
+    \item \textbf{Xe}: +120 qua sông, +80 xâm nhập cung Tướng, +80 cột mở, $-60$ chưa ra quân
+    \item \textbf{Pháo}: +40 trục giữa, +60 qua sông, +50 áp sát cung Tướng
+    \item \textbf{Mã}: +30 trung tâm, +70 qua sông, +60 gần cung Tướng, $-40$ ở biên
+    \item \textbf{Tốt}: +80 qua sông, +40 gần cung Tướng, $-30$ chạm đáy
+    \item \textbf{Tướng}: $-30$ rời trục giữa, $-40$ tiến lên
+    \item \textbf{Sĩ}: +15 ở giữa cung
+\end{itemize}
+
+\subsection{Hệ thống 10 cấp độ}
+\begin{table}[H]
+\centering
+\caption{Cấu hình 10 level của Search Agent}
+\begin{tabular}{ccccl}
+\toprule
+\textbf{Level} & \textbf{Depth} & \textbf{Heuristic} & \textbf{Move Ordering} & \textbf{Mô tả} \\
+\midrule
+1 & 1 & Basic & Không & Rất yếu \\
+2 & 1 & Advanced & Không & Yếu \\
+3 & 2 & Basic & Không & Trung bình thấp \\
+4 & 2 & Advanced & Không & Trung bình \\
+5 & 2 & Advanced & Có & Trung bình khá \\
+6 & 3 & Basic & Không & Khá \\
+7 & 3 & Advanced & Không & Giỏi \\
+8 & 3 & Advanced & Có & Rất giỏi \\
+9 & 4 & Advanced & Không & Xuất sắc \\
+10 & 4 & Advanced & Có & Cao thủ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Anti-Repetition trong Search}
+Search Agent cũng phạt nước đi lặp:
+\begin{itemize}
+    \item \textbf{Backtrack Penalty}: $-5000$ cho nước quay đầu (A→B rồi B→A)
+    \item \textbf{Cycle Penalty}: $-8000$ cho chu trình 4 nước
+\end{itemize}

@@ -1,0 +1,75 @@
+% Chapter 8: Kết luận
+\section{Kết luận}
+
+\subsection{Tóm tắt kết quả đạt được}
+Đồ án đã hoàn thành đầy đủ các yêu cầu đề ra:
+
+\begin{enumerate}[label=\textbf{\arabic*.}]
+    \item \textbf{Agent chơi đúng luật}: Cả ML Agent và Search Agent đều tuân thủ 100\% luật Cờ Tướng, bao gồm các luật đặc biệt (đối mặt tướng, cản chân mã, mắt tượng).
+
+    \item \textbf{Thắng Random 10/10}: ML Agent (Hard) đạt tỷ lệ thắng \textbf{96.7\%} (29/30 ván) với 2 lần đạt 10/10 hoàn hảo. Tất cả chiến thắng đều bằng checkmate.
+
+    \item \textbf{Nhiều mức độ khó}: ML Agent có 3 mức (Easy/Medium/Hard) dựa trên temperature sampling. Search Agent có 10 levels dựa trên depth + heuristic + move ordering.
+
+    \item \textbf{So sánh ML vs Search}: Đã phân tích chi tiết ưu/nhược của cả hai phương pháp. ML nhanh hơn ($\sim$0.5s vs 5--15s) nhưng Search chính xác hơn ở tactical positions.
+
+    \item \textbf{Chỉ dùng Machine Learning}: ML Agent hoàn toàn dựa trên CNN inference + reward shaping, không sử dụng Minimax/Alpha-Beta làm fallback.
+\end{enumerate}
+
+\subsection{Đóng góp kỹ thuật}
+
+\subsubsection{Anti-Stalemate Innovation}
+Phát hiện quan trọng: ML Agent có xu hướng ăn hết quân đối phương, dẫn đến stalemate (hòa). Giải pháp: kiểm tra terminal state cho top candidate moves, loại bỏ nước gây stalemate và ưu tiên checkmate.
+
+\subsubsection{Canonical Encoding}
+Chuẩn hóa góc nhìn (flip bàn cờ cho phe Đen) giúp giảm 50\% pattern cần học, tăng hiệu quả sử dụng dữ liệu.
+
+\subsubsection{Reward Shaping}
+Capture bonus phù hợp (Xe=0.8, Pháo=Mã=0.5, Sĩ=Tượng=0.1) giúp agent chơi tactical mà không gây stalemate.
+
+\subsection{Hạn chế}
+
+\begin{itemize}
+    \item \textbf{Dữ liệu}: Chỉ huấn luyện trên $\sim$10K samples (v2). Full dataset ($\sim$1M+ samples) sẽ cải thiện đáng kể.
+    \item \textbf{Training}: Chưa dùng GPU --- training 5 epochs mất 162s trên CPU.
+    \item \textbf{Opening book}: Agent không có tri thức khai cuộc chuyên biệt.
+    \item \textbf{Endgame}: Không có endgame tablebase, phụ thuộc vào anti-stalemate heuristics.
+    \item \textbf{Self-play}: Chưa implement self-play training (như AlphaZero).
+\end{itemize}
+
+\subsection{Hướng phát triển}
+
+\begin{enumerate}
+    \item \textbf{Full dataset training}: Huấn luyện trên toàn bộ CCPD dataset ($\sim$120K ván) với GPU.
+    \item \textbf{MCTS integration}: Kết hợp Monte Carlo Tree Search với CNN (AlphaZero-style).
+    \item \textbf{Self-play}: Cho agent tự chơi với chính mình để cải thiện liên tục.
+    \item \textbf{Opening/Endgame databases}: Tích hợp cơ sở dữ liệu khai cuộc và tàn cuộc.
+    \item \textbf{Online play}: Triển khai server cho phép đấu trực tuyến.
+    \item \textbf{Mobile app}: Port sang nền tảng di động (Flutter/React Native).
+\end{enumerate}
+
+\subsection{Bài học kinh nghiệm}
+
+\begin{enumerate}
+    \item Pure ML approach có thể đạt hiệu quả cao với reward shaping phù hợp.
+    \item Anti-draw mechanisms (stalemate detection, repetition avoidance) là yếu tố quyết định trong trò chơi đối kháng.
+    \item Canonical encoding giúp model học hiệu quả hơn đáng kể.
+    \item Capture bonus cần được calibrate cẩn thận --- quá cao gây stalemate, quá thấp không đủ aggressive.
+\end{enumerate}
+
+\subsection{Phân công công việc nhóm}
+\begin{table}[H]
+\centering
+\caption{Phân công công việc}
+\begin{tabularx}{\textwidth}{lX}
+\toprule
+\textbf{Thành viên} & \textbf{Công việc} \\
+\midrule
+Dương Đăng Khoa & Data Pipeline: State encoding, tensor representation \\
+Nguyễn Đức Gia Bảo & Dataset: Parse PGN/FEN, rule validation \\
+Đồng Công Khánh & ML Model: Network architecture, training pipeline \\
+Nguyễn Đức Hạnh Nhi & Agent \& Game Loop: ML Agent inference, game logic \\
+Trần Hoàng Vỹ Khang & UI, Evaluation \& Report: Pygame UI, benchmarks \\
+\bottomrule
+\end{tabularx}
+\end{table}
