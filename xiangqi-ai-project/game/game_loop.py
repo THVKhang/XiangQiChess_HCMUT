@@ -125,3 +125,7 @@ def run_game(
     max_turns: int = 500,
 ) -> GameLoopResult:
     return GameLoop(red_agent=red_agent, black_agent=black_agent, state=state, max_turns=max_turns).play()
+
+
+# Alias used by headless_match.py
+run_headless_game = run_game

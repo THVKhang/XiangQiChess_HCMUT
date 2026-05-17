@@ -27,22 +27,21 @@ def _build_search_agent(level: str, color: Color, algorithm: str = "alphabeta"):
     agent_cls = level_map.get(level, EasyAgent)
     return agent_cls(player_id=color, algorithm=algorithm)
 
-def _build_ml_agent(color: Color, model_path: str = None):
-    # Week 1: model_path is optional. Without a trained file, MLAgent loads a dummy model.
-    return MLAgent(player_id=color, model_path=model_path)
+def _build_ml_agent(color: Color, ml_level: str = "Hard", model_path: str = None):
+    return MLAgent(player_id=color, level=ml_level, model_path=model_path)
 
 
-def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None):
+def _build_agents(mode: str, level: str, red_level: str = None, black_level: str = None, ml_level: str = "Hard"):
     if mode == "Human vs AI":
         return Color.RED, None, _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
     if mode == "Human vs ML":
-        return Color.RED, None, _build_ml_agent(Color.BLACK)
+        return Color.RED, None, _build_ml_agent(Color.BLACK, ml_level=ml_level)
     if mode == "AI vs Random":
         return None, _build_search_agent(level, Color.RED, algorithm="alphabeta"), RandomAgent(player_id=Color.BLACK)
     if mode == "ML vs Random":
-        return None, _build_ml_agent(Color.RED), RandomAgent(player_id=Color.BLACK)
+        return None, _build_ml_agent(Color.RED, ml_level=ml_level), RandomAgent(player_id=Color.BLACK)
     if mode == "ML vs Search":
-        return None, _build_ml_agent(Color.RED), _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
+        return None, _build_ml_agent(Color.RED, ml_level=ml_level), _build_search_agent(level, Color.BLACK, algorithm="alphabeta")
     if mode == "AI vs AI":
         red_lv = red_level or level
         black_lv = black_level or level
@@ -210,6 +209,7 @@ def main():
                         menu.selected_level,
                         red_level=menu.selected_red_level,
                         black_level=menu.selected_black_level,
+                        ml_level=menu.selected_ml_level,
                     )
                     ai_elapsed_ms = 0
                     processed_plies = 0

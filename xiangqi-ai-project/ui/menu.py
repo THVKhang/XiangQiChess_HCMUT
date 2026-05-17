@@ -38,6 +38,7 @@ class Menu:
 
         self.selected_mode = "Human vs AI"
         self.selected_level = "Easy"
+        self.selected_ml_level = "Hard"
         self.selected_red_level = "Easy"
         self.selected_black_level = "Easy"
 
@@ -52,6 +53,7 @@ class Menu:
 
         self.mode_buttons: list[tuple[str, pygame.Rect]] = []
         self.level_buttons: list[tuple[str, pygame.Rect]] = []
+        self.ml_level_buttons: list[tuple[str, pygame.Rect]] = []
         self.red_level_buttons: list[tuple[str, pygame.Rect]] = []
         self.black_level_buttons: list[tuple[str, pygame.Rect]] = []
         self.start_button = pygame.Rect(0, 0, 1, 1)
@@ -122,6 +124,13 @@ class Menu:
             by = level_top + i * (btn_h + row_gap)
             self.level_buttons.append((lv, pygame.Rect(bx, by, level_btn_w, btn_h)))
 
+        # ML level buttons (same layout as regular level buttons)
+        self.ml_level_buttons.clear()
+        for i, lv in enumerate(self.levels):
+            bx = cx - level_btn_w // 2
+            by = level_top + i * (btn_h + row_gap)
+            self.ml_level_buttons.append((lv, pygame.Rect(bx, by, level_btn_w, btn_h)))
+
         self.red_level_buttons.clear()
         self.black_level_buttons.clear()
         split_w = (inner_w - col_gap) // 2
@@ -146,7 +155,7 @@ class Menu:
         if event.type == pygame.MOUSEMOTION:
             pos = event.pos
             self.hovered_rect = None
-            for _, r in (self.mode_buttons + self.level_buttons
+            for _, r in (self.mode_buttons + self.level_buttons + self.ml_level_buttons
                          + self.red_level_buttons + self.black_level_buttons):
                 if r.collidepoint(pos):
                     self.hovered_rect = r
@@ -170,6 +179,9 @@ class Menu:
             for lv, r in self.level_buttons:
                 if r.collidepoint(pos):
                     self.selected_level = lv
+            for lv, r in self.ml_level_buttons:
+                if r.collidepoint(pos):
+                    self.selected_ml_level = lv
             for lv, r in self.red_level_buttons:
                 if r.collidepoint(pos):
                     self.selected_red_level = lv
@@ -250,7 +262,13 @@ class Menu:
 
         # Difficulty heading
         needs_split = self.selected_mode == "AI vs AI"
-        h2_text = "RED AI  /  BLACK AI" if needs_split else "DIFFICULTY"
+        is_ml_mode = self.selected_mode in ("Human vs ML", "ML vs Random", "ML vs Search")
+        if needs_split:
+            h2_text = "RED AI  /  BLACK AI"
+        elif is_ml_mode:
+            h2_text = "ML LEVEL"
+        else:
+            h2_text = "DIFFICULTY"
         h2 = self.heading_font.render(h2_text, True, self.HEADING_CLR)
         screen.blit(h2, h2.get_rect(center=(cx, self._divider_y + 16)))
 
@@ -259,6 +277,9 @@ class Menu:
                 self._draw_btn(screen, r, f"Red: {lv}", selected=(lv == self.selected_red_level))
             for lv, r in self.black_level_buttons:
                 self._draw_btn(screen, r, f"Blk: {lv}", selected=(lv == self.selected_black_level))
+        elif is_ml_mode:
+            for lv, r in self.ml_level_buttons:
+                self._draw_btn(screen, r, lv, selected=(lv == self.selected_ml_level))
         else:
             for lv, r in self.level_buttons:
                 self._draw_btn(screen, r, lv, selected=(lv == self.selected_level))
@@ -270,6 +291,8 @@ class Menu:
         # Status
         if self.selected_mode == "AI vs AI":
             info = f"{self.selected_mode}  ·  Red {self.selected_red_level}  vs  Black {self.selected_black_level}"
+        elif self.selected_mode in ("Human vs ML", "ML vs Random", "ML vs Search"):
+            info = f"{self.selected_mode}  ·  ML {self.selected_ml_level}"
         else:
             info = f"{self.selected_mode}  ·  {self.selected_level}"
         info_surf = self.small_font.render(info, True, self.INFO_CLR)

@@ -40,8 +40,8 @@ def _build_search(level: str, color: Color):
     cls = level_map[level]
     return cls(player_id=color)
 
-def _build_ml(color: Color):
-    return MLAgent(player_id=color)
+def _build_ml(color: Color, level: str = "Hard"):
+    return MLAgent(player_id=color, level=level)
 
 def _run_one_game(red_agent, black_agent, game_index: int, matchup: str, max_turns: int) -> MatchRecord:
     start = time.perf_counter()
