@@ -372,17 +372,23 @@ class MLAgent(BaseAgent):
             if move.capture is not None:
                 scores[i] += CAPTURE_BONUS.get(move.capture.kind, 0.1)
 
-        # Step 3: Anti-stalemate + detect checkmate — check ALL moves
+        # Step 3: Anti-stalemate + detect checkmate
+        # Check top-scoring moves AND all capture moves for terminal states
         from core.move_generator import result_if_terminal
-        for i in range(len(moves)):
+        ranked = sorted(range(len(moves)), key=lambda j: scores[j], reverse=True)
+        check_set = set(ranked[:5])  # Top 5 by score
+        for i, mv in enumerate(moves):  # + all captures
+            if mv.capture is not None:
+                check_set.add(i)
+        for i in check_set:
             next_state = state.clone()
             next_state.apply_move(moves[i])
             terminal = result_if_terminal(next_state)
             if terminal is not None:
                 if terminal.winner == self.player_id:
-                    scores[i] += 1000.0  # Checkmate! Highest priority
+                    scores[i] += 1000.0  # Checkmate!
                 elif terminal.reason == "stalemate":
-                    scores[i] = 0.0  # Stalemate = draw, avoid!
+                    scores[i] = 0.0  # Avoid stalemate
 
         # Step 4: Anti-repetition using position hash tracking
         # Build set of position hashes seen so far in the game

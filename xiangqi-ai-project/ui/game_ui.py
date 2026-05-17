@@ -23,13 +23,13 @@ class GameUI:
         self.width = width
         self.height = height
 
-        self.background_color = (242, 210, 140)
-        self.line_color = (70, 40, 20)
-        self.red_color = (180, 40, 40)
-        self.black_color = (30, 30, 30)
-        self.highlight_color = (255, 215, 0)
-        self.hover_color = (180, 180, 180)
-        self.panel_color = (245, 240, 230)
+        self.background_color = (205, 170, 109)
+        self.line_color = (56, 32, 14)
+        self.red_color = (178, 34, 34)
+        self.black_color = (25, 25, 25)
+        self.highlight_color = (255, 200, 40)
+        self.hover_color = (200, 180, 140)
+        self.panel_color = (235, 220, 190)
 
         self.cols = 9
         self.rows = 10
@@ -522,7 +522,6 @@ class GameUI:
         if hasattr(self.state, "apply_move"):
             try:
                 try:
-                    from core.move import Move
                     from core.move_generator import assert_legal_move
 
                     move_obj = Move(src=(from_row, from_col), dst=(to_row, to_col))
@@ -735,7 +734,7 @@ class GameUI:
                 screen.blit(marker, marker.get_rect(center=(x, y)))
 
     def _draw_board_background(self, screen):
-        pad = max(8, int(self.cell_size * 0.45))
+        pad = max(10, int(self.cell_size * 0.50))
         board_rect = pygame.Rect(
             self.board_left - pad,
             self.board_top - pad,
@@ -743,61 +742,80 @@ class GameUI:
             self.board_height + pad * 2,
         )
 
-        # Slightly richer board base than global background.
-        pygame.draw.rect(screen, (226, 194, 124), board_rect, border_radius=8)
+        # Classic wood board base — warm golden-brown
+        pygame.draw.rect(screen, (218, 182, 118), board_rect, border_radius=6)
 
-        # River gets a distinct but close tone to create depth.
+        # River area — slightly lighter for contrast
         river_top = self.board_top + 4 * self.cell_size + 2
         river_h = max(10, self.cell_size - 4)
         river_rect = pygame.Rect(self.board_left, river_top, self.board_width, river_h)
-        pygame.draw.rect(screen, (210, 176, 106), river_rect)
+        pygame.draw.rect(screen, (225, 195, 135), river_rect)
 
-        # Draw subtle horizontal grain lines using alpha overlay.
+        # Wood grain effect — horizontal lines with subtle variation
         grain = pygame.Surface((board_rect.width, board_rect.height), pygame.SRCALPHA)
-        step = max(5, int(self.cell_size * 0.12))
+        step = max(4, int(self.cell_size * 0.08))
         for y in range(0, board_rect.height, step):
-            alpha = 30 if (y // step) % 2 == 0 else 18
-            pygame.draw.line(grain, (112, 82, 46, alpha), (0, y), (board_rect.width, y), 1)
-
-        # Add faint vertical shading so the board has more depth at a glance.
-        for x in range(0, board_rect.width, max(8, step * 2)):
-            v_alpha = 10 if (x // max(8, step * 2)) % 2 == 0 else 6
-            pygame.draw.line(grain, (104, 74, 40, v_alpha), (x, 0), (x, board_rect.height), 1)
+            alpha = 22 if (y // step) % 3 == 0 else 12
+            pygame.draw.line(grain, (100, 70, 35, alpha), (0, y), (board_rect.width, y), 1)
         screen.blit(grain, board_rect.topleft)
 
-        pygame.draw.rect(screen, (126, 92, 54), board_rect, width=3, border_radius=8)
+        # Thick outer border — dark wood frame
+        pygame.draw.rect(screen, (72, 44, 22), board_rect, width=4, border_radius=6)
+        # Inner decorative border
+        inner_rect = board_rect.inflate(-8, -8)
+        pygame.draw.rect(screen, (110, 72, 38), inner_rect, width=2, border_radius=4)
 
     def _draw_board(self, screen):
-        grid_color = (88, 58, 36)
-        line_w = 1 if self.cell_size <= 72 else 2
+        grid_color = (62, 38, 18)
+        line_w = 2 if self.cell_size > 50 else 1
 
+        # Horizontal lines
         for row in range(self.rows):
             y = self.board_top + row * self.cell_size
             pygame.draw.line(screen, grid_color, (self.board_left, y), (self.board_left + self.board_width, y), line_w)
 
+        # Vertical lines (split at river)
         for col in range(self.cols):
             x = self.board_left + col * self.cell_size
             pygame.draw.line(screen, grid_color, (x, self.board_top), (x, self.board_top + 4 * self.cell_size), line_w)
             pygame.draw.line(screen, grid_color, (x, self.board_top + 5 * self.cell_size), (x, self.board_top + 9 * self.cell_size), line_w)
 
-        pygame.draw.line(
-            screen,
-            grid_color,
-            (self.board_left, self.board_top),
-            (self.board_left, self.board_top + self.board_height),
-            line_w,
-        )
-        pygame.draw.line(
-            screen,
-            grid_color,
-            (self.board_left + self.board_width, self.board_top),
-            (self.board_left + self.board_width, self.board_top + self.board_height),
-            line_w,
-        )
+        # Left and right border lines (full height)
+        pygame.draw.line(screen, grid_color, (self.board_left, self.board_top), (self.board_left, self.board_top + self.board_height), line_w)
+        pygame.draw.line(screen, grid_color, (self.board_left + self.board_width, self.board_top), (self.board_left + self.board_width, self.board_top + self.board_height), line_w)
+
+        # Star points (花星) — traditional markers at cannon and soldier positions
+        self._draw_star_points(screen)
+
+    def _draw_star_points(self, screen):
+        """Draw traditional star point markers at cannon and soldier positions."""
+        mark_color = (62, 38, 18)
+        mark_len = max(4, int(self.cell_size * 0.12))
+        mark_gap = max(2, int(self.cell_size * 0.06))
+        # Positions that get star marks: cannons (row 2/7, col 1/7) + soldiers (row 3/6)
+        star_positions = [
+            (2, 1), (2, 7),  # Black cannon positions
+            (7, 1), (7, 7),  # Red cannon positions
+            (3, 0), (3, 2), (3, 4), (3, 6), (3, 8),  # Black soldier positions
+            (6, 0), (6, 2), (6, 4), (6, 6), (6, 8),  # Red soldier positions
+        ]
+        for (row, col) in star_positions:
+            cx, cy = self.board_to_screen(row, col)
+            # Draw 4 L-shaped marks around the intersection
+            for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                # Skip marks that would go outside the board
+                if col == 0 and dx == -1:
+                    continue
+                if col == 8 and dx == 1:
+                    continue
+                sx = cx + dx * mark_gap
+                sy = cy + dy * mark_gap
+                pygame.draw.line(screen, mark_color, (sx, sy), (sx + dx * mark_len, sy), 1)
+                pygame.draw.line(screen, mark_color, (sx, sy), (sx, sy + dy * mark_len), 1)
 
     def _draw_palaces(self, screen):
-        grid_color = (88, 58, 36)
-        line_w = 1 if self.cell_size <= 72 else 2
+        grid_color = (62, 38, 18)
+        line_w = 2 if self.cell_size > 50 else 1
         pygame.draw.line(screen, grid_color, self.board_to_screen(0, 3), self.board_to_screen(2, 5), line_w)
         pygame.draw.line(screen, grid_color, self.board_to_screen(0, 5), self.board_to_screen(2, 3), line_w)
         pygame.draw.line(screen, grid_color, self.board_to_screen(7, 3), self.board_to_screen(9, 5), line_w)
@@ -805,16 +823,17 @@ class GameUI:
 
     def _draw_river_text(self, screen):
         if self.supports_cjk:
-            left_label = "楚 河"
-            right_label = "漢 界"
+            left_label = "楚  河"
+            right_label = "漢  界"
         else:
             left_label = "CHU HE"
             right_label = "HAN JIE"
-        t1 = self.river_font.render(left_label, True, (90, 50, 20))
-        t2 = self.river_font.render(right_label, True, (90, 50, 20))
+        river_color = (110, 64, 28)
+        t1 = self.river_font.render(left_label, True, river_color)
+        t2 = self.river_font.render(right_label, True, river_color)
         river_y = int(self.board_top + 4.5 * self.cell_size - t1.get_height() // 2)
-        screen.blit(t1, (int(self.board_left + 1.2 * self.cell_size), river_y))
-        screen.blit(t2, (int(self.board_left + 5.2 * self.cell_size), river_y))
+        screen.blit(t1, (int(self.board_left + 0.8 * self.cell_size), river_y))
+        screen.blit(t2, (int(self.board_left + 5.5 * self.cell_size), river_y))
 
     def _draw_coordinates(self, screen):
         for row in range(self.rows):
@@ -861,21 +880,22 @@ class GameUI:
         if self.state is None or not hasattr(self.state, "board"):
             return
 
-        outer_r = max(10, int(self.cell_size * 0.36))
-        inner_r = outer_r - 1
-        fill_r = inner_r + 1
-        shadow_offset = max(1, int(self.cell_size * 0.06))
-        shadow_r = max(6, int(fill_r * 0.95))
+        # Classic piece sizing — larger, rounder pieces
+        outer_r = max(14, int(self.cell_size * 0.42))
+        inner_r = outer_r - max(2, int(self.cell_size * 0.04))
+        fill_r = outer_r
+        shadow_offset = max(2, int(self.cell_size * 0.05))
+        shadow_r = max(8, int(fill_r * 0.98))
 
-        # One reusable alpha surface keeps shadow rendering cheap.
-        shadow_surface = pygame.Surface((shadow_r * 2 + 2, shadow_r * 2 + 2), pygame.SRCALPHA)
-        pygame.draw.circle(shadow_surface, (20, 12, 8, 55), (shadow_r + 1, shadow_r + 1), shadow_r)
+        # Drop shadow
+        shadow_surface = pygame.Surface((shadow_r * 2 + 4, shadow_r * 2 + 4), pygame.SRCALPHA)
+        pygame.draw.circle(shadow_surface, (15, 8, 4, 65), (shadow_r + 2, shadow_r + 2), shadow_r)
 
-        # Gloss highlight at the top of each piece for a subtle polished look.
-        gloss_w = max(10, int(self.cell_size * 0.52))
-        gloss_h = max(5, int(self.cell_size * 0.18))
+        # Gloss highlight — classic polished wood look
+        gloss_w = max(12, int(self.cell_size * 0.48))
+        gloss_h = max(5, int(self.cell_size * 0.16))
         gloss_surface = pygame.Surface((gloss_w, gloss_h), pygame.SRCALPHA)
-        pygame.draw.ellipse(gloss_surface, (255, 252, 242, 72), (0, 0, gloss_w, gloss_h))
+        pygame.draw.ellipse(gloss_surface, (255, 255, 248, 60), (0, 0, gloss_w, gloss_h))
 
         def draw_piece_at(px, py, label, color_name, hanzi):
             shadow_rect = shadow_surface.get_rect(center=(px + shadow_offset, py + shadow_offset))
@@ -885,13 +905,28 @@ class GameUI:
             if img:
                 screen.blit(img, img.get_rect(center=(px, py)))
             else:
-                color = self.red_color if color_name == "red" else self.black_color
-                pygame.draw.circle(screen, (245, 230, 200), (px, py), fill_r)
-                pygame.draw.circle(screen, color, (px, py), inner_r, 2)
-                glyph = self.piece_font.render(hanzi, True, color)
+                # Classic double-ring piece design
+                if color_name == "red":
+                    fill_color = (248, 235, 210)  # Cream fill for red pieces
+                    ring_color = (178, 34, 34)     # Deep red ring
+                    text_color = (178, 34, 34)
+                else:
+                    fill_color = (248, 235, 210)  # Same cream fill
+                    ring_color = (25, 25, 25)      # Black ring
+                    text_color = (25, 25, 25)
+
+                # Fill circle
+                pygame.draw.circle(screen, fill_color, (px, py), fill_r)
+                # Outer ring (thick)
+                pygame.draw.circle(screen, ring_color, (px, py), outer_r, max(2, int(self.cell_size * 0.04)))
+                # Inner decorative ring
+                inner_ring_r = inner_r - max(2, int(self.cell_size * 0.04))
+                pygame.draw.circle(screen, ring_color, (px, py), inner_ring_r, 1)
+                # Hanzi character — centered, bold
+                glyph = self.piece_font.render(hanzi, True, text_color)
                 screen.blit(glyph, glyph.get_rect(center=(px, py)))
 
-            gloss_rect = gloss_surface.get_rect(center=(px, py - max(2, int(self.cell_size * 0.16))))
+            gloss_rect = gloss_surface.get_rect(center=(px, py - max(2, int(self.cell_size * 0.14))))
             screen.blit(gloss_surface, gloss_rect)
 
         for row in range(self.rows):
